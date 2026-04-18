@@ -11,7 +11,7 @@ redis_client.flushdb()
 
 
 def extract_group_id(link):
-    match = re.search(r"(?:m\.)?vk\.com/(.*)", link)
+    match = re.search(r"(?:m\.)?(?:vk\.(?:com|ru))/(.*)", link)
     if match:
         return match.group(1)
     return None
