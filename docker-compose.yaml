@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vkback
+    restart: unless-stopped
+    ports:
+      - "5050:8000"
+    depends_on:
+      - redis
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+
+volumes:
+  redis_data:
+
+networks:
+  app_network:
+    driver: bridge
