@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
@@ -12,8 +12,8 @@ executor = ThreadPoolExecutor(max_workers=3)
 
 
 @router.post("", response_class=PlainTextResponse)
-async def vk_callback(request):
-    data = request.data
+async def vk_callback(request: Request):
+    data = await request.json()
 
     if data.get("type") == "confirmation":
         return settings.vk_group_confirmation_token.get_secret_value()
