@@ -12,7 +12,6 @@ class ResultOfCheck:
     fixed_post: bool
     market: bool
     status: bool
-    can_message: bool | None
     reposts: bool | None
     hashtags: bool | None
     average_time_between_posts: dict | None
@@ -21,12 +20,12 @@ class ResultOfCheck:
 
 @dataclass
 class GroupInfo:
-    name: str
-    photo_100: str
-    photo_200: str
-    activity: str
-    members_count: int
-    result_of_check: ResultOfCheck
+    name: str | None
+    photo_100: str | None
+    photo_200: str | None
+    activity: str | None
+    members_count: int | None
+    result_of_check: ResultOfCheck | None
 
 
 @dataclass
@@ -38,12 +37,12 @@ class Parameter:
 
 @dataclass
 class APIResponse:
-    name: str
-    photo_100: str
-    photo_200: str
-    activity: str
-    members_count: int
-    score: int
+    name: str | None
+    photo_100: str | None
+    photo_200: str | None
+    activity: str | None
+    members_count: int | None
+    score: int 
     good: List[Parameter]
     normal: List[Parameter]
     bad: List[Parameter]

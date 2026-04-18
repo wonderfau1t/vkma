@@ -9,8 +9,8 @@ router = APIRouter()
 
 
 @router.get("/{group_id}")
-async def analyze_group(group_id: str, user_token: VKVerifiedTokenDep):
-    group_info = get_group_info(group_id, user_token)
+async def analyze_group(group_id: str):
+    group_info = get_group_info(group_id)
     if group_info is None:
         return {"error_message": "Невозможно провести аудит группы"}
     response: APIResponse = generate_response(group_info)

@@ -45,7 +45,7 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
                             ),
                         )
                     )
-                    score += 3.85
+                    score += 4.17
                 elif 6 < avegarage_time_between_posts_in_hours < 30:
                     good.append(
                         Parameter(
@@ -59,7 +59,7 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
                             ),
                         )
                     )
-                    score += 7.69
+                    score += 8.34
                 else:
                     normal.append(
                         Parameter(
@@ -83,7 +83,7 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
                         description=messages[field]["info"].format(value),
                     )
                 )
-                score += 7.69
+                score += 8.34
             elif 1 < value < 3:
                 normal.append(
                     Parameter(
@@ -92,7 +92,7 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
                         description=messages[field]["info"].format(value),
                     )
                 )
-                score += 3.85
+                score += 4.17
             else:
                 bad.append(
                     Parameter(
@@ -110,7 +110,7 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
                     description=messages[field]["positive"],
                 )
             )
-            score += 7.69
+            score += 8.34
         else:
             if field in ["cover", "description", "can_message"]:
                 bad.append(
@@ -142,10 +142,10 @@ def generate_response(group_info: GroupInfo) -> APIResponse:
     )
 
 
-def get_group_info(group_id: int | str, user_token: str) -> GroupInfo | None:
-    group_info, group_id = get_main_info(group_id)
+def get_group_info(group_id: int | str) -> GroupInfo | None:
+    group_info, group_id = get_main_info(group_id) # type: ignore
     if group_info:
-        posts_info = get_posts_info(group_id, group_info.members_count, user_token)
+        posts_info = get_posts_info(group_id, group_info.members_count)
         if posts_info is None:
             return None
         group_info.result_of_check.reposts = posts_info["reposts"]
@@ -159,13 +159,13 @@ def get_group_info(group_id: int | str, user_token: str) -> GroupInfo | None:
 
 
 def get_main_info(
-    group_id: int, user_token: str
-) -> Tuple[GroupInfo, int] | Tuple[None, None] | dict:
+    group_id: int | str,
+) -> Tuple[GroupInfo, int] | Tuple[None, None] | dict | Tuple[GroupInfo, None]:
     params = {
         "group_id": group_id,
-        "fields": "contacts,counters,cover,description,fixed_post,market,activity,members_count,can_message",
+        "fields": "contacts,counters,cover,description,fixed_post,market,activity,members_count",
     }
-    response = client.get("groups.getById", params, user_token)
+    response = client.get("groups.getById", params)
     data = response["response"]["groups"][0] if response.get("response") else {}
 
     if bool(data.get("name")):
@@ -183,13 +183,13 @@ def get_main_info(
             result_of_check=ResultOfCheck(
                 contacts=bool(data.get("contacts")),
                 cover=bool(data.get("cover", {}).get("enabled")),
-                clips=(data["counters"].get("clips", 0) > 0),
+                # clips=(data["counters"].get("clips", 0) > 0),
+                clips=False,
                 screen_name=bool(is_default_screen_name(data.get("screen_name"))),
                 description=bool(data.get("description")),
                 fixed_post=bool(data.get("fixed_post")),
                 market=bool(data.get("market", {}).get("enabled")),
                 status=status,
-                can_message=bool(data["can_message"]),
                 reposts=None,
                 hashtags=None,
                 average_time_between_posts=None,
@@ -199,9 +199,9 @@ def get_main_info(
     return None, None
 
 
-def get_posts_info(group_id: int, members_count: int, user_token: str):
+def get_posts_info(group_id: int, members_count: int):
     params = {"owner_id": f"-{group_id}", "count": 100}
-    response = client.get("wall.get", params, user_token)
+    response = client.get("wall.get", params)
     if response.get("error"):
         return None
     posts = response["response"]["items"]
@@ -233,17 +233,6 @@ def get_posts_info(group_id: int, members_count: int, user_token: str):
 def filter_recent_posts(posts, days: int):
     cutoff_date = datetime.now() - timedelta(days=days)
     return [post for post in posts if datetime.fromtimestamp(post["date"]) > cutoff_date]
-
-
-def can_message_to_group(group_id: int, user_access_token: str) -> bool:
-    # Получить можно только с помощью ключа пользователя
-    response = client.get(
-        "groups.getById",
-        params={"group_id": group_id, "fields": "can_message"},
-        access_token=user_access_token,
-    )
-    data = response["response"]["groups"][0]
-    return bool(data["can_message"])
 
 
 def is_default_screen_name(screen_name):

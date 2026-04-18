@@ -3,8 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    vk_group_token: SecretStr
     vk_protected_key: SecretStr
     vk_service_token: SecretStr
+    vk_group_confirmation_token: SecretStr
     vk_app_id: int
 
     model_config = SettingsConfigDict(
@@ -16,4 +18,4 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+settings = Settings()  # type: ignore

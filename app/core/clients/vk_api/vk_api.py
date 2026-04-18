@@ -1,11 +1,18 @@
 import requests
 
+from app.core.config import settings
+
 
 class VKApiClient:
     def __init__(self):
         self.api_version = "5.199"
         self.base_url = "https://api.vk.ru/method/"
-        self.tokens = {}
+        self.tokens = {
+            "groups.getById": settings.vk_service_token.get_secret_value(),
+            "groups.getOnlineStatus": settings.vk_group_token.get_secret_value(),
+            "wall.get": settings.vk_service_token.get_secret_value(),
+            "messages.send": settings.vk_group_token.get_secret_value(),
+        }
 
     def get(self, endpoint: str, params: dict | None = None, token: str | None = None):
         params = params or {}
