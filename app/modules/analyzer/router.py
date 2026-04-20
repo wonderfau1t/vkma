@@ -1,20 +1,21 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.clients import AsyncVKApiClient
 from app.core.clients.vk_api.auth import VKVerifiedTokenDep
+from app.dependencies import get_vk_client
 
-from .models import APIResponse
-from .service import generate_response, get_group_info
+from .service import build_analysis_response, fetch_group_analysis
 
 router = APIRouter()
 
 
 @router.get("/{group_id}")
-async def analyze_group(group_id: str):
-    group_info = get_group_info(group_id)
+async def analyze_group(group_id: str, vk_client: AsyncVKApiClient = Depends(get_vk_client)):
+    group_info = await fetch_group_analysis(group_id, vk_client)
     if group_info is None:
         return {"error_message": "Невозможно провести аудит группы"}
-    response: APIResponse = generate_response(group_info)
-    return response.to_dict()
+    response = build_analysis_response(group_info)
+    return response
 
 
 @router.get("/test-token")

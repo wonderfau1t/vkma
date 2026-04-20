@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import List
 
 
@@ -24,8 +24,8 @@ class GroupInfo:
     photo_100: str | None
     photo_200: str | None
     activity: str | None
-    members_count: int | None
-    result_of_check: ResultOfCheck | None
+    members_count: int
+    result_of_check: ResultOfCheck
 
 
 @dataclass
@@ -42,10 +42,7 @@ class APIResponse:
     photo_200: str | None
     activity: str | None
     members_count: int | None
-    score: int 
+    score: int
     good: List[Parameter]
     normal: List[Parameter]
     bad: List[Parameter]
-
-    def to_dict(self):
-        return asdict(self)

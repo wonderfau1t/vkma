@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     vk_protected_key: SecretStr
     vk_service_token: SecretStr
     vk_group_confirmation_token: SecretStr
+    ai_service_api_key: SecretStr
     vk_app_id: int
 
     model_config = SettingsConfigDict(

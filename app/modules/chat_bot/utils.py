@@ -1,13 +1,10 @@
 import re
 from math import ceil
 
-import redis
+from redis.asyncio import Redis
 
-from app.core.clients.vk_api import client
+from app.core.clients import AsyncVKApiClient
 from app.modules.analyzer.models import APIResponse
-
-redis_client = redis.Redis(host="redis", port=6379, db=0)
-redis_client.flushdb()
 
 
 def extract_group_id(link):
@@ -17,7 +14,9 @@ def extract_group_id(link):
     return None
 
 
-def send_message(user_id: int, message: str, keyboard: str | None = None):
+async def send_message(
+    user_id: int, message: str, vk_client: AsyncVKApiClient, keyboard: str | None = None
+):
     params = {
         "user_id": user_id,
         "message": message,
@@ -25,15 +24,15 @@ def send_message(user_id: int, message: str, keyboard: str | None = None):
     }
     if keyboard:
         params["keyboard"] = keyboard
-    client.post("messages.send", params)
+    await vk_client.post("messages.send", params)
 
 
-def set_user_state(user_id, state):
-    redis_client.set(f"user_state:{user_id}", state)
+async def set_user_state(user_id: int, state: str, redis_client: Redis):
+    await redis_client.set(f"user_state:{user_id}", state)
 
 
-def get_user_state(user_id):
-    state = redis_client.get(f"user_state:{user_id}")
+async def get_user_state(user_id: int, redis_client: Redis):
+    state = await redis_client.get(f"user_state:{user_id}")
     return state.decode("utf-8") if state else "idle"
 
 

@@ -12,3 +12,7 @@ wheels/
 
 # IDE conf
 .vscode
+
+*.png
+*.jpg
+*.txt
