@@ -43,7 +43,7 @@ async def get_verified_vk_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверная подпись VK launch params (sign)",
         )
-    return vk_params
+    return vk_params["vk_user_id"]
 
 
-VKVerifiedTokenDep = Annotated[dict, Depends(get_verified_vk_token)]
+VKVerifiedTokenDep = Annotated[int, Depends(get_verified_vk_token)]
