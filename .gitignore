@@ -13,6 +13,7 @@ wheels/
 # IDE conf
 .vscode
 
+*.log
 *.png
 *.jpg
 *.txt

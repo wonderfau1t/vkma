@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from app.core.clients import AIService, AsyncVKApiClient
 from app.core.config import settings
+from app.core.logger import setup_logging
 from app.database.db_helper import DBHelper
 from app.database.models import Base
 from app.modules.analyzer.router import router as analyzer_router
@@ -16,6 +17,11 @@ from app.modules.generator.router import router as generator_router
 
 if not os.path.exists("media"):
     os.makedirs("media")
+
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+
+setup_logging()
 
 
 @asynccontextmanager

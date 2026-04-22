@@ -19,14 +19,14 @@ async def is_donut(vk_client: AsyncVKApiClient, group_id: int, user_id: int):
     return False
 
 
-async def prosecc_generation(
+async def process_generation(
     client: AIService, db: AsyncSession, generation_type: str, task_id: str, prompt: str
 ):
     try:
         if generation_type == "image":
             response: str = await client.generate_image(prompt, task_id)
         else:
-            # response: str = await client.generate_post(prompt)
+            response: str = await client.generate_post(prompt, task_id)
             response: str = "suka"
         # FIX: Не факт что в респонсе номральный ответ
         await update_task(db, task_id, TaskStatus.SUCCESS, response)

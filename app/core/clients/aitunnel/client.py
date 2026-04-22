@@ -1,6 +1,8 @@
 import base64
+import os
 
-from openai import AsyncOpenAI
+from loguru import logger
+from openai import APIStatusError, AsyncOpenAI, BadRequestError, OpenAIError, RateLimitError
 
 
 class AIService:
@@ -16,56 +18,131 @@ class AIService:
     async def generate_image(
         self, prompt: str, image_name: str, model: str = "gemini-2.5-flash-image"
     ):
-        response = await self._client.images.generate(model=model, prompt=prompt)
-        if not response or not isinstance(response.data, list):
-            raise ValueError("Пришел корявый ответ от сервиса генерации")
+        try:
+            response = await self._client.images.generate(model=model, prompt=prompt)
+            if not response.data or not response.data[0]:
+                raise ValueError("API вернул пустой список данных")
 
-        image_b64 = response.data[0].url
-        if not image_b64:
-            raise ValueError("Нету ссылки в ответе")
+            image_data = response.data[0].url
+            if not image_data:
+                raise ValueError("В объекте ответа отсутствуют и данные изображения, и URL")
 
-        path = self._save_image(image_b64, image_name)
-        if not path:
-            raise ValueError("Ошибка при сохранении")
+            path = self._save_image(image_data, image_name)
+            if not path:
+                raise RuntimeError(f"Не удалось сохранить изображение по пути: {image_name}")
 
-        return path
+            return path
+        except BadRequestError as e:
+            # Ошибка промпта (например, цензура или неверные параметры)
+            logger.error(f"Некорректный запрос (цензура?): {e}")
+            raise
+        except RateLimitError as e:
+            # Закончились деньги или лимиты в минуту
+            logger.warning(f"Превышены лимиты запросов: {e}")
+            raise
+        except APIStatusError as e:
+            # Ошибка на стороне серверов OpenAI (500, 502 и т.д.)
+            logger.error(f"Сервер OpenAI ответил ошибкой {e.status_code}: {e.message}")
+            raise
+        except OpenAIError as e:
+            # Базовый класс для всех ошибок библиотеки OpenAI
+            logger.error(f"Общая ошибка OpenAI: {e}")
+            raise
+        except Exception as e:
+            # Непредвиденные ошибки (проблемы с сетью, ОС, сохранением файла)
+            logger.exception(f"Непредвиденная системная ошибка: {e}")
+            raise
 
-    async def generate_post(self, prompt: str, model: str = "gpt-4.1-nano"): ...
+    async def generate_post(self, prompt: str, task_id: str, model: str = "gpt-4.1-nano"):
+        try:
+            response = await self._client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Ты — эксперт по SMM и копирайтингу с 10-летним опытом. Твоя задача — создавать виральные и полезные посты для соцсетей (Instagram, Telegram, VK). "
+                            "Придерживайся следующих правил:"
+                            "1. Заголовок: Всегда начинай с цепляющего заголовка, который бьет в боль или интерес аудитории."
+                            '2. Тон: Дружелюбный, экспертный, но доступный. Избегай официоза и "воды".'
+                            "3. Структура: Используй абзацы для читаемости и списки (буллиты), если это уместно."
+                            "4. Призыв к действию (CTA): Каждый пост должен заканчиваться вопросом к аудитории или четким призывом (подписаться, перейти по ссылке, сохранить)."
+                            "5. Визуал: Описывай в конце поста идею для подходящей фотографии или картинки."
+                            "6. Эмодзи: Используй их умеренно для акцентов, не перегружай текст."
+                            "Пиши на языке пользователя, адаптируй стиль под контекст темы."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.8,
+            )
+            if not response.choices:
+                logger.error(f"[{task_id}] API вернул пустой список вариантов (choices)")
+                raise ValueError("OpenAI вернул пустой ответ")
+
+            message = response.choices[0].message
+
+            # Проверка на пустой контент (иногда API может вернуть пустую строку при ошибке фильтрации контента)
+            if not message.content or message.content.strip() == "":
+                logger.warning(f"[{task_id}] Получено пустое сообщение от модели")
+                raise ValueError("Модель сгенерировала пустой текст")
+
+            return message.content
+
+        except BadRequestError as e:
+            # Неверные параметры или срабатывание фильтров безопасности контента
+            logger.error(f"[{task_id}] Ошибка запроса (возможно, запрещенная тема): {e}")
+            raise
+        except RateLimitError as e:
+            # Превышение лимитов (закончились токены или слишком много запросов в секунду)
+            logger.warning(f"[{task_id}] Лимит запросов исчерпан: {e}")
+            raise
+        except APIStatusError as e:
+            # Проблемы на стороне серверов OpenAI
+            logger.error(f"[{task_id}] Ошибка сервиса OpenAI (Status: {e.status_code})")
+            raise
+        except OpenAIError as e:
+            # Общая ошибка библиотеки
+            logger.error(f"[{task_id}] Ошибка OpenAI SDK: {e}")
+            raise
+        except Exception as e:
+            # Любые другие ошибки (сеть, тайм-ауты, ошибки кода)
+            logger.exception(f"[{task_id}] Критическая ошибка при генерации поста: {e}")
+            raise
 
     def _save_image(self, image_b64: str, image_name: str):
         if "," in image_b64:
             image_b64 = image_b64.split(",")[1]
         try:
-            # 3. Декодируем base64 в бинарные данные
-            img_data = base64.b64decode(image_b64)
+            # 2. Проверяем/создаем папку для медиа
+            directory = "media"
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                logger.info(f"Создана директория: {directory}")
 
-            # 4. Сохраняем в файл изображения
-            with open(f"media/{image_name}.png", "wb") as img_file:
+            # 3. Декодируем base64 в бинарные данные
+            try:
+                img_data = base64.b64decode(image_b64, validate=True)
+            except Exception as e:
+                logger.error(f"Ошибка валидации base64: {e}")
+                return None
+
+            # 4. Формируем путь и сохраняем
+            file_name = f"{image_name}.png"
+            file_path = os.path.join(directory, file_name)
+
+            # Используем контекстный менеджер для безопасной записи
+            with open(file_path, "wb") as img_file:
                 img_file.write(img_data)
 
-            return image_name + ".png"
+            logger.info(f"Изображение успешно сохранено: {file_path}")
+            return file_name  # Или file_path, если вам нужен полный путь
 
+        except PermissionError:
+            logger.error(f"Ошибка доступа: нет прав на запись в директорию {directory}")
+        except OSError as e:
+            logger.error(f"Системная ошибка ввода-вывода при сохранении {image_name}: {e}")
         except Exception as e:
-            print(f"Ошибка при декодировании: {e}")
+            logger.exception(f"Непредвиденная ошибка в _save_image: {e}")
 
-
-# from app.core.config import settings
-
-# client = OpenAI(
-#     api_key=settings.ai_tunnel_api_key.get_secret_value(),
-#     base_url="https://api.aitunnel.ru/v1/",
-# )
-
-# # Делаем запрос
-# response = client.images.generate(
-#     model="gemini-3.1-flash-image-preview",
-#     prompt="Хорошее освещение, солнце бликует на камере. Нужно чтобы девушка стояла с хотдогом",
-# )
-
-
-# image_url = response.data[0].url
-
-# with open("image_31flash_image_b64.txt", "w") as fh:
-#     fh.write(image_url)
-
-# print("Успешно записано!")
+        return None

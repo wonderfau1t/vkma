@@ -1,8 +1,9 @@
-import asyncio
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Request
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AIService, AsyncVKApiClient
@@ -16,11 +17,11 @@ from app.database.crud import (
     get_user_by_user_id,
     has_processing_tasks,
 )
-from app.database.models import GenerationType
+from app.database.models import GenerationType, TaskStatus
 from app.dependencies import get_ai_client, get_db, get_vk_client
 
 from .models import GenerateRequest
-from .service import is_donut, prosecc_generation
+from .service import is_donut, process_generation
 
 router = APIRouter()
 
@@ -34,18 +35,28 @@ async def get_balance(
     user = await get_user_by_user_id(db, user_id)
     if not user:
         user = await create_user(db, user_id)
+        logger.info(f"Создан новый пользователь: {user_id}")
+    try:
+        is_now_donut = await is_donut(vk_client, settings.group_id, user_id)
+        if is_now_donut:
+            if not user.is_donut:
+                user.balance = 1000
+                user.is_donut = True
+                await db.commit()
+                logger.info(f"Пользователь {user_id} стал доном. Баланс обновлен до 1000.")
+        else:
+            if user.is_donut:
+                user.balance = 30
+                user.is_donut = False
+                await db.commit()
+                logger.info(f"Пользователь {user_id} перестал быть доном. Баланс сброшен до 30.")
 
-    is_now_donut = await is_donut(vk_client, settings.group_id, user_id)
-    if is_now_donut:
-        if not user.is_donut:
-            user.balance = 1000
-            user.is_donut = True
-            await db.commit()
-    else:
-        if user.is_donut:
-            user.balance = 30
-            user.is_donut = False
-            await db.commit()
+        return {
+            "balance": user.balance,
+            "isDonut": user.is_donut,
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при проверке Donut для {user_id}: {e}")
 
     return {
         "balance": user.balance,
@@ -74,10 +85,13 @@ async def get_tasks(
 async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(get_db)):
     task = await get_task_by_task_id(db, task_id=task_id)
     if not task:
-        return {"status": "failedresultnetu"}
+        logger.warning(f"Запрос несуществующей задачи: {task_id}")
+        return {"status": "not_found"}
+    if task.status == TaskStatus.PROCESSING or task.status == TaskStatus.FAILED:
+        return {"status": task.status}
     return {
         "status": task.status,
-        "result": f"{request.base_url}images/{task.result}",
+        "result": f"https://vk.wonderrfau1t.site/images/{task.result}",
     }
 
 
@@ -91,29 +105,38 @@ async def generate(
     # Существует ли пользователь
     user = await get_user_by_user_id(db, user_id)
     if not user:
-        return {"message": "Не существует клиента"}
+        logger.error(f"Попытка генерации несуществующим пользователем: {user_id}")
+        raise HTTPException(status_code=404, detail="Клиент не найден")
 
-    if data.type == "image ":
-        generation_cost = 10
-    else:
-        generation_cost = 2
+    generation_cost = 10 if data.type == "image" else 2
 
     # Достаточно баланса?
     if user.balance < generation_cost:
+        logger.info(f"Недостаточно средств у {user_id}: нужно {generation_cost}, есть {user.balance}")
         return {"message": "Недостаточно токенов на балансе"}
 
     task_id = str(uuid.uuid4())
     gen_type = GenerationType.IMAGE if data.type == "image" else GenerationType.POST
-    await create_task(
-        db,
-        task_id,
-        gen_type,
-        user_id,
-        data.prompt,
-    )
+    
+    try:
+        user.balance -= generation_cost
+        await create_task(
+            db,
+            task_id,
+            gen_type,
+            user_id,
+            data.prompt,
+        )
+        await db.commit()
 
-    # Отправка задачи в работу (фоновая генерация)
-    asyncio.create_task(prosecc_generation(ai_client, db, gen_type, task_id, data.prompt))
+        logger.info(f"Задача {task_id} создана ({gen_type}). Списано {generation_cost} токенов у {user_id}")
+
+        asyncio.create_task(process_generation(ai_client, db, gen_type, task_id, data.prompt))
+        
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Ошибка при создании задачи генерации для {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
     # Ответ пользователю с id задачи
     return {"taskId": task_id}
@@ -149,6 +172,7 @@ async def get_history(
 
 @router.get("/balance-fake")
 async def fake_get_balance(session: AsyncSession = Depends(get_db)):
+    logger.warning("ВОРНИНГ")
     return {
         "balance": 1000,
         "isDon": True,
