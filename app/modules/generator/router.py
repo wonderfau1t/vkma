@@ -91,7 +91,7 @@ async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(ge
         return {"status": task.status}
     return {
         "status": task.status,
-        "result": f"https://vk.wonderrfau1t.site/images/{task.result}",
+        "result": f"https://vk.wonderrfau1t.site/images/{task.result}" if task.type == GenerationType.IMAGE else task.result,
     }
 
 
@@ -132,7 +132,7 @@ async def generate(
         logger.info(f"Задача {task_id} создана ({gen_type}). Списано {generation_cost} токенов у {user_id}")
 
         asyncio.create_task(process_generation(ai_client, db, gen_type, task_id, data.prompt))
-        
+
     except Exception as e:
         await db.rollback()
         logger.exception(f"Ошибка при создании задачи генерации для {user_id}: {e}")

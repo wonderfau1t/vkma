@@ -27,7 +27,6 @@ async def process_generation(
             response: str = await client.generate_image(prompt, task_id)
         else:
             response: str = await client.generate_post(prompt, task_id)
-            response: str = "suka"
         # FIX: Не факт что в респонсе номральный ответ
         await update_task(db, task_id, TaskStatus.SUCCESS, response)
     except:
