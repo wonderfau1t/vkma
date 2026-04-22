@@ -1,7 +1,7 @@
+import asyncio
 import uuid
 from typing import Literal
 
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +91,9 @@ async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(ge
         return {"status": task.status}
     return {
         "status": task.status,
-        "result": f"https://vk.wonderrfau1t.site/images/{task.result}" if task.type == GenerationType.IMAGE else task.result,
+        "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
+        if task.type == GenerationType.IMAGE
+        else task.result,
     }
 
 
@@ -112,12 +114,14 @@ async def generate(
 
     # Достаточно баланса?
     if user.balance < generation_cost:
-        logger.info(f"Недостаточно средств у {user_id}: нужно {generation_cost}, есть {user.balance}")
+        logger.info(
+            f"Недостаточно средств у {user_id}: нужно {generation_cost}, есть {user.balance}"
+        )
         return {"message": "Недостаточно токенов на балансе"}
 
     task_id = str(uuid.uuid4())
     gen_type = GenerationType.IMAGE if data.type == "image" else GenerationType.POST
-    
+
     try:
         user.balance -= generation_cost
         await create_task(
@@ -129,7 +133,9 @@ async def generate(
         )
         await db.commit()
 
-        logger.info(f"Задача {task_id} создана ({gen_type}). Списано {generation_cost} токенов у {user_id}")
+        logger.info(
+            f"Задача {task_id} создана ({gen_type}). Списано {generation_cost} токенов у {user_id}"
+        )
 
         asyncio.create_task(process_generation(ai_client, db, gen_type, task_id, data.prompt))
 
@@ -162,7 +168,9 @@ async def get_history(
             "id": task.id,
             "createdAt": task.created_at,
             "prompt": task.prompt,
-            "result": task.result,
+            "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
+            if task.type == GenerationType.IMAGE
+            else task.result,
         }
         for task in tasks
     ]
