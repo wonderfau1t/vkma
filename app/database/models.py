@@ -28,6 +28,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     balance: Mapped[int]
     is_donut: Mapped[bool] = mapped_column(default=False)
+    last_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tasks: Mapped[List["GenerationTask"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

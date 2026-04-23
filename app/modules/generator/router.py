@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Literal
 
@@ -36,31 +37,39 @@ async def get_balance(
     if not user:
         user = await create_user(db, user_id)
         logger.info(f"Создан новый пользователь: {user_id}")
-    try:
-        is_now_donut = await is_donut(vk_client, settings.group_id, user_id)
-        if is_now_donut:
-            if not user.is_donut:
-                user.balance = 1000
-                user.is_donut = True
-                await db.commit()
-                logger.info(f"Пользователь {user_id} стал доном. Баланс обновлен до 1000.")
-        else:
-            if user.is_donut:
-                user.balance = 30
-                user.is_donut = False
-                await db.commit()
-                logger.info(f"Пользователь {user_id} перестал быть доном. Баланс сброшен до 30.")
 
-        return {
-            "balance": user.balance,
-            "isDonut": user.is_donut,
-        }
+    now = datetime.now(timezone.utc)
+    # Порог обновления (30 дней)
+    is_time_to_reset = user.last_reset_at is None or (now - user.last_reset_at) >= timedelta(days=30)
+
+    try:
+        # Получаем актуальный статус из VK
+        is_now_donut = await is_donut(vk_client, settings.group_id, user_id)
+        
+        # Определяем, изменился ли статус по сравнению с базой
+        status_changed = is_now_donut != user.is_donut
+        
+        # ЛОГИКА ОБНОВЛЕНИЯ
+        if status_changed or is_time_to_reset:
+            # Определяем новый лимит
+            new_balance = 1000 if is_now_donut else 30
+            
+            user.balance = new_balance
+            user.is_donut = is_now_donut
+            user.last_reset_at = now
+            
+            await db.commit()
+            
+            reason = "смена статуса" if status_changed else "плановое обновление (30 дней)"
+            logger.info(f"Баланс пользователя {user_id} обновлен до {new_balance} ({reason})")
+
     except Exception as e:
-        logger.error(f"Ошибка при проверке Donut для {user_id}: {e}")
+        logger.error(f"Ошибка при проверке баланса для {user_id}: {e}")
 
     return {
         "balance": user.balance,
         "isDonut": user.is_donut,
+        "nextResetAt": (user.last_reset_at + timedelta(days=30)) if user.last_reset_at else None
     }
 
 
@@ -166,7 +175,7 @@ async def get_history(
     items = [
         {
             "id": task.id,
-            "createdAt": task.created_at,
+            "createdAt": task.created_at.strftime("%H:%M %d.%m.%Y"),
             "prompt": task.prompt,
             "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
             if task.type == GenerationType.IMAGE

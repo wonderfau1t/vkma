@@ -1,14 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
+from loguru import logger
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AsyncVKApiClient
 from app.core.config import settings
+from app.database.crud import create_user, get_user_by_user_id
 from app.dependencies import get_db, get_redis_client, get_vk_client
-from app.database.crud import get_user_by_user_id, create_user
 
 from .handlers import handle_message_sync
 
@@ -21,7 +23,7 @@ async def vk_callback(
     request: Request,
     vk_client: AsyncVKApiClient = Depends(get_vk_client),
     redis_client: Redis = Depends(get_redis_client),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     data = await request.json()
 
@@ -48,17 +50,22 @@ async def vk_callback(
         user = await get_user_by_user_id(db, user_id)
         if not user:
             await create_user(db, user_id)
-            return
+            return "ok"
+        
         user.balance = 1000
         user.is_donut = True
+        user.last_reset_at = datetime.now(timezone.utc)
         await db.commit()
-    
+        logger.info(f"Webhook: {event_type} для {user_id}. Баланс 1000, дата обновлена.")
+        return "ok"
+
     elif event_type in ["donut_subscription_expired", "donut_subscription_cancelled"]:
         user = await get_user_by_user_id(db, user_id)
         if not user:
-            await create_user(db, user_id)
-            return
+            return "ok"
         user.balance = 30
         user.is_donut = False
+        user.last_reset_at = datetime.now(timezone.utc)
         await db.commit()
-    
+        logger.info(f"Webhook: {event_type} для {user_id}. Баланс 30, дата обновлена.")
+        return "ok"
