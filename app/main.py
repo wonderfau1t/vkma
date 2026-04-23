@@ -43,8 +43,8 @@ async def lifespan(app: FastAPI):
 
     app.state.db = DBHelper(
         f"postgresql+asyncpg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/myapp",
-        True,
-        True,
+        False,
+        False,
     )
     async with app.state.db.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
