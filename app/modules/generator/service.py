@@ -1,5 +1,4 @@
 from loguru import logger
-from openai import BadRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AIService, AsyncVKApiClient
@@ -40,17 +39,11 @@ async def process_generation(
         else:
             result, cost_rub = await client.generate_post(prompt, task_id)
         await update_task(db, task_id, TaskStatus.SUCCESS, result, cost_rub)
-    except BadRequestError as e:
-        error_code = e.body.get("error", {}).get("code") if isinstance(e.body, dict) else None
-        if error_code == "no_images_generated":
-            user = await db.get(User, user_id)
-            if user:
-                user.balance += cost
-                await db.commit()
-                logger.info(f"Баланс пользователя {user_id} возвращён: +{cost} (no_images_generated)")
-            error_msg = "Не удалось сгенерировать изображение. Токены возвращены на баланс."
-        else:
-            error_msg = e.message
-        await update_task(db, task_id, TaskStatus.FAILED, error_msg)
     except Exception as e:
+        logger.error(f"Ошибка генерации [{task_id}]: {e}")
+        user = await db.get(User, user_id)
+        if user:
+            user.balance += cost
+            await db.commit()
+            logger.info(f"Баланс пользователя {user_id} возвращён: +{cost}")
         await update_task(db, task_id, TaskStatus.FAILED, str(e))
