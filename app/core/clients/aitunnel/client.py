@@ -24,7 +24,16 @@ class AIService:
         reference_image: str | None = None,
         aspect_ratio: str | None = None,
     ):
-        extra = {"aspect_ratio": aspect_ratio} if aspect_ratio else {}
+        extra = {
+            "image_config": {
+                "aspect_ratio": aspect_ratio,
+            }
+        } if aspect_ratio else {}
+        logger.info(
+            f"Генерация изображения [{image_name}]: "
+            f"референс={'да' if reference_image else 'нет'}, "
+            f"aspect_ratio={aspect_ratio or 'не указан'}"
+        )
         try:
             if reference_image:
                 image_bytes = base64.b64decode(reference_image)
