@@ -3,7 +3,7 @@ import io
 import os
 
 from loguru import logger
-from openai import APIStatusError, AsyncOpenAI, BadRequestError, OpenAIError, RateLimitError
+from openai import APIStatusError, AsyncOpenAI, OpenAIError, RateLimitError
 
 
 class AIService:
@@ -58,24 +58,16 @@ class AIService:
                 raise RuntimeError(f"Не удалось сохранить изображение по пути: {image_name}")
 
             return path, self._extract_cost_rub(response)
-        except BadRequestError as e:
-            # Ошибка промпта (например, цензура или неверные параметры)
-            logger.error(f"Некорректный запрос (цензура?): {e}")
-            raise
         except RateLimitError as e:
-            # Закончились деньги или лимиты в минуту
             logger.warning(f"Превышены лимиты запросов: {e}")
             raise
         except APIStatusError as e:
-            # Ошибка на стороне серверов OpenAI (500, 502 и т.д.)
             logger.error(f"Сервер OpenAI ответил ошибкой {e.status_code}: {e.message}")
             raise
         except OpenAIError as e:
-            # Базовый класс для всех ошибок библиотеки OpenAI
             logger.error(f"Общая ошибка OpenAI: {e}")
             raise
         except Exception as e:
-            # Непредвиденные ошибки (проблемы с сетью, ОС, сохранением файла)
             logger.exception(f"Непредвиденная системная ошибка: {e}")
             raise
 
@@ -115,12 +107,7 @@ class AIService:
 
             return message.content, self._extract_cost_rub(response)
 
-        except BadRequestError as e:
-            # Неверные параметры или срабатывание фильтров безопасности контента
-            logger.error(f"[{task_id}] Ошибка запроса (возможно, запрещенная тема): {e}")
-            raise
         except RateLimitError as e:
-            # Превышение лимитов (закончились токены или слишком много запросов в секунду)
             logger.warning(f"[{task_id}] Лимит запросов исчерпан: {e}")
             raise
         except APIStatusError as e:
