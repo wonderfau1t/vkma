@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 class GenerateRequest(BaseModel):
     type: Literal["image", "post"]
     prompt: str
-    reference_image: str | None = None
     aspect_ratio: str | None = None
 
 

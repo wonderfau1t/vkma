@@ -25,7 +25,7 @@ async def process_generation(
     generation_type: str,
     task_id: str,
     prompt: str,
-    reference_image: str | None = None,
+    reference_image: bytes | None = None,
     aspect_ratio: str | None = None,
 ):
     try:

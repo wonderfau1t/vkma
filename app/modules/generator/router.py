@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from loguru import logger
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,8 +112,11 @@ async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(ge
 
 @router.post("/generate")
 async def generate(
-    data: GenerateRequest,
+    type: Annotated[Literal["image", "post"], Form()],
+    prompt: Annotated[str, Form()],
     user_id: VKVerifiedTokenDep,
+    aspect_ratio: Annotated[str | None, Form()] = None,
+    reference_image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     ai_client: AIService = Depends(get_ai_client),
     redis_client: Redis = Depends(get_redis_client),
@@ -123,7 +128,7 @@ async def generate(
         raise HTTPException(status_code=404, detail="Клиент не найден")
 
     costs = await get_costs(redis_client)
-    generation_cost = costs[data.type]
+    generation_cost = costs[type]
 
     # Достаточно баланса?
     if user.balance < generation_cost:
@@ -133,7 +138,8 @@ async def generate(
         return {"message": "Недостаточно токенов на балансе"}
 
     task_id = str(uuid.uuid4())
-    gen_type = GenerationType.IMAGE if data.type == "image" else GenerationType.POST
+    gen_type = GenerationType.IMAGE if type == "image" else GenerationType.POST
+    image_bytes = await reference_image.read() if reference_image else None
 
     try:
         user.balance -= generation_cost
@@ -142,7 +148,7 @@ async def generate(
             task_id,
             gen_type,
             user_id,
-            data.prompt,
+            prompt,
         )
         await db.commit()
 
@@ -152,7 +158,7 @@ async def generate(
 
         asyncio.create_task(
             process_generation(
-                ai_client, db, gen_type, task_id, data.prompt, data.reference_image, data.aspect_ratio
+                ai_client, db, gen_type, task_id, prompt, image_bytes, aspect_ratio
             )
         )
 
