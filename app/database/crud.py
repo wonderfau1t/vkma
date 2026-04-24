@@ -61,7 +61,7 @@ async def get_history_by_type(
 ) -> Sequence[GenerationTask]:
     query = (
         select(GenerationTask)
-        .where(GenerationTask.type == task_type, GenerationTask.user_id == user_id)
+        .where(GenerationTask.type == task_type, GenerationTask.user_id == user_id, GenerationTask.status == TaskStatus.SUCCESS)
         .order_by(GenerationTask.created_at.desc())
     )
 
