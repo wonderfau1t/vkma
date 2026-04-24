@@ -8,12 +8,13 @@ class Settings(BaseSettings):
     vk_service_token: SecretStr
     vk_group_confirmation_token: SecretStr
     ai_service_api_key: SecretStr
+    admin_secret: SecretStr
     vk_app_id: int
     DB_HOST: str
     DB_PORT: int
     DB_USER: str
     DB_PASSWORD: str
-    group_id: int 
+    group_id: int
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -5,10 +5,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from loguru import logger
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AIService, AsyncVKApiClient
-from app.core.clients.vk_api.auth import VKVerifiedTokenDep
+from app.core.clients.vk_api.auth import AdminSecretDep, VKVerifiedTokenDep
 from app.core.config import settings
 from app.database.crud import (
     create_task,
@@ -19,9 +20,10 @@ from app.database.crud import (
     has_processing_tasks,
 )
 from app.database.models import GenerationType, TaskStatus
-from app.dependencies import get_ai_client, get_db, get_vk_client
+from app.dependencies import get_ai_client, get_db, get_redis_client, get_vk_client
 
-from .models import GenerateRequest
+from .costs import get_costs, set_costs
+from .models import GenerateRequest, UpdateCostsRequest
 from .service import is_donut, process_generation
 
 router = APIRouter()
@@ -112,6 +114,7 @@ async def generate(
     user_id: VKVerifiedTokenDep,
     db: AsyncSession = Depends(get_db),
     ai_client: AIService = Depends(get_ai_client),
+    redis_client: Redis = Depends(get_redis_client),
 ):
     # Существует ли пользователь
     user = await get_user_by_user_id(db, user_id)
@@ -119,7 +122,8 @@ async def generate(
         logger.error(f"Попытка генерации несуществующим пользователем: {user_id}")
         raise HTTPException(status_code=404, detail="Клиент не найден")
 
-    generation_cost = 10 if data.type == "image" else 2
+    costs = await get_costs(redis_client)
+    generation_cost = costs[data.type]
 
     # Достаточно баланса?
     if user.balance < generation_cost:
@@ -185,6 +189,22 @@ async def get_history(
     ]
 
     return {"count": len(items), "items": items}
+
+
+@router.get("/costs")
+async def get_generation_costs(redis_client: Redis = Depends(get_redis_client)):
+    return await get_costs(redis_client)
+
+
+@router.patch("/costs")
+async def update_generation_costs(
+    data: UpdateCostsRequest,
+    _: AdminSecretDep,
+    redis_client: Redis = Depends(get_redis_client),
+):
+    await set_costs(redis_client, image=data.image, post=data.post)
+    logger.info(f"Стоимость генерации обновлена: image={data.image}, post={data.post}")
+    return {"image": data.image, "post": data.post}
 
 
 @router.get("/balance-fake")

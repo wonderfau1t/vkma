@@ -47,3 +47,13 @@ async def get_verified_vk_token(
 
 
 VKVerifiedTokenDep = Annotated[int, Depends(get_verified_vk_token)]
+
+
+async def verify_admin_secret(
+    x_admin_secret: Annotated[str, Header(alias="X-Admin-Secret")],
+) -> None:
+    if x_admin_secret != settings.admin_secret.get_secret_value():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступ запрещён")
+
+
+AdminSecretDep = Annotated[None, Depends(verify_admin_secret)]

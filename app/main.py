@@ -39,7 +39,6 @@ async def lifespan(app: FastAPI):
         api_key=settings.ai_service_api_key.get_secret_value(),
     )
     app.state.redis_client = Redis(host="localhost", port=6379, db=0)
-    await app.state.redis_client.flushdb()
 
     app.state.db = DBHelper(
         f"postgresql+asyncpg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/myapp",
