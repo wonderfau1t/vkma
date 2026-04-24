@@ -42,13 +42,16 @@ async def get_task_by_task_id(db: AsyncSession, task_id: str) -> GenerationTask 
     return result.scalar_one_or_none()
 
 
-async def update_task(db: AsyncSession, task_id: str, status: TaskStatus, result: str):
+async def update_task(
+    db: AsyncSession, task_id: str, status: TaskStatus, result: str, cost_rub: float | None = None
+):
     task = await db.get(GenerationTask, task_id)
     if not task:
         raise ValueError("Task not found")
 
     task.status = status
     task.result = result
+    task.cost_rub = cost_rub
     await db.commit()
     await db.refresh(task)
 

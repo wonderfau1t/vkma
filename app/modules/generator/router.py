@@ -150,7 +150,11 @@ async def generate(
             f"Задача {task_id} создана ({gen_type}). Списано {generation_cost} токенов у {user_id}"
         )
 
-        asyncio.create_task(process_generation(ai_client, db, gen_type, task_id, data.prompt))
+        asyncio.create_task(
+            process_generation(
+                ai_client, db, gen_type, task_id, data.prompt, data.reference_image, data.aspect_ratio
+            )
+        )
 
     except Exception as e:
         await db.rollback()

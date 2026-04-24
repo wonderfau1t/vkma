@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 
 from loguru import logger
@@ -16,10 +17,27 @@ class AIService:
         await self._client.close()
 
     async def generate_image(
-        self, prompt: str, image_name: str, model: str = "gemini-2.5-flash-image"
+        self,
+        prompt: str,
+        image_name: str,
+        model: str = "gemini-2.5-flash-image",
+        reference_image: str | None = None,
+        aspect_ratio: str | None = None,
     ):
+        extra = {"aspect_ratio": aspect_ratio} if aspect_ratio else {}
         try:
-            response = await self._client.images.generate(model=model, prompt=prompt)
+            if reference_image:
+                image_bytes = base64.b64decode(reference_image)
+                image_file = io.BytesIO(image_bytes)
+                image_file.name = "reference.png"
+                response = await self._client.images.edit(
+                    model=model, image=image_file, prompt=prompt, extra_body=extra
+                )
+            else:
+                response = await self._client.images.generate(
+                    model=model, prompt=prompt, extra_body=extra
+                )
+
             if not response.data or not response.data[0]:
                 raise ValueError("API вернул пустой список данных")
 
@@ -31,7 +49,7 @@ class AIService:
             if not path:
                 raise RuntimeError(f"Не удалось сохранить изображение по пути: {image_name}")
 
-            return path
+            return path, self._extract_cost_rub(response)
         except BadRequestError as e:
             # Ошибка промпта (например, цензура или неверные параметры)
             logger.error(f"Некорректный запрос (цензура?): {e}")
@@ -87,7 +105,7 @@ class AIService:
                 logger.warning(f"[{task_id}] Получено пустое сообщение от модели")
                 raise ValueError("Модель сгенерировала пустой текст")
 
-            return message.content
+            return message.content, self._extract_cost_rub(response)
 
         except BadRequestError as e:
             # Неверные параметры или срабатывание фильтров безопасности контента
@@ -109,6 +127,11 @@ class AIService:
             # Любые другие ошибки (сеть, тайм-ауты, ошибки кода)
             logger.exception(f"[{task_id}] Критическая ошибка при генерации поста: {e}")
             raise
+
+    @staticmethod
+    def _extract_cost_rub(response) -> float | None:
+        usage = getattr(response, "usage", None)
+        return getattr(usage, "cost_rub", None)
 
     def _save_image(self, image_b64: str, image_name: str):
         if "," in image_b64:

@@ -20,14 +20,21 @@ async def is_donut(vk_client: AsyncVKApiClient, group_id: int, user_id: int):
 
 
 async def process_generation(
-    client: AIService, db: AsyncSession, generation_type: str, task_id: str, prompt: str
+    client: AIService,
+    db: AsyncSession,
+    generation_type: str,
+    task_id: str,
+    prompt: str,
+    reference_image: str | None = None,
+    aspect_ratio: str | None = None,
 ):
     try:
         if generation_type == "image":
-            response: str = await client.generate_image(prompt, task_id)
+            result, cost_rub = await client.generate_image(
+                prompt, task_id, reference_image=reference_image, aspect_ratio=aspect_ratio
+            )
         else:
-            response: str = await client.generate_post(prompt, task_id)
-        # FIX: Не факт что в респонсе номральный ответ
-        await update_task(db, task_id, TaskStatus.SUCCESS, response)
+            result, cost_rub = await client.generate_post(prompt, task_id)
+        await update_task(db, task_id, TaskStatus.SUCCESS, result, cost_rub)
     except:
         await update_task(db, task_id, TaskStatus.FAILED, "error_message")
