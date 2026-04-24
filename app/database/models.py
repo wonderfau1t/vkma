@@ -46,6 +46,7 @@ class GenerationTask(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus), default=TaskStatus.PROCESSING)
     result: Mapped[str] = mapped_column(nullable=True)
+    cost_rub: Mapped[float] = mapped_column(nullable=True)
 
     user: Mapped["User"] = relationship(
         back_populates="tasks",
