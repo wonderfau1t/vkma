@@ -158,7 +158,8 @@ async def generate(
 
         asyncio.create_task(
             process_generation(
-                ai_client, db, gen_type, task_id, prompt, image_bytes, aspect_ratio
+                ai_client, db, gen_type, task_id, prompt, image_bytes, aspect_ratio,
+                user_id=user_id, cost=generation_cost,
             )
         )
 
