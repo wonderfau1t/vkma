@@ -21,7 +21,7 @@ class AIService:
         prompt: str,
         image_name: str,
         model: str = "gemini-2.5-flash-image",
-        reference_image: str | None = None,
+        reference_image: bytes | None = None,
         aspect_ratio: str | None = None,
     ):
         extra = {
@@ -36,8 +36,7 @@ class AIService:
         )
         try:
             if reference_image:
-                image_bytes = base64.b64decode(reference_image)
-                image_file = io.BytesIO(image_bytes)
+                image_file = io.BytesIO(reference_image)
                 image_file.name = "reference.png"
                 response = await self._client.images.edit(
                     model=model, image=image_file, prompt=prompt, extra_body=extra
