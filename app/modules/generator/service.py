@@ -48,6 +48,9 @@ async def process_generation(
                 user.balance += cost
                 await db.commit()
                 logger.info(f"Баланс пользователя {user_id} возвращён: +{cost} (no_images_generated)")
-        await update_task(db, task_id, TaskStatus.FAILED, "error_message")
-    except:
-        await update_task(db, task_id, TaskStatus.FAILED, "error_message")
+            error_msg = "Не удалось сгенерировать изображение. Токены возвращены на баланс."
+        else:
+            error_msg = e.message
+        await update_task(db, task_id, TaskStatus.FAILED, error_msg)
+    except Exception as e:
+        await update_task(db, task_id, TaskStatus.FAILED, str(e))

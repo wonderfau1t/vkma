@@ -100,8 +100,10 @@ async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(ge
     if not task:
         logger.warning(f"Запрос несуществующей задачи: {task_id}")
         return {"status": "not_found"}
-    if task.status == TaskStatus.PROCESSING or task.status == TaskStatus.FAILED:
+    if task.status == TaskStatus.PROCESSING:
         return {"status": task.status}
+    if task.status == TaskStatus.FAILED:
+        return {"status": task.status, "errorMessage": task.result}
     return {
         "status": task.status,
         "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
