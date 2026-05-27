@@ -61,7 +61,11 @@ async def get_history_by_type(
 ) -> Sequence[GenerationTask]:
     query = (
         select(GenerationTask)
-        .where(GenerationTask.type == task_type, GenerationTask.user_id == user_id, GenerationTask.status == TaskStatus.SUCCESS)
+        .where(
+            GenerationTask.type == task_type,
+            GenerationTask.user_id == user_id,
+            GenerationTask.status == TaskStatus.SUCCESS,
+        )
         .order_by(GenerationTask.created_at.desc())
     )
 
@@ -69,13 +73,11 @@ async def get_history_by_type(
 
     return result.scalars().all()
 
+
 async def has_processing_tasks(db: AsyncSession, user_id: int) -> GenerationTask | None:
     query = (
         select(GenerationTask)
-        .where(
-            GenerationTask.user_id == user_id,
-            GenerationTask.status == TaskStatus.PROCESSING
-        )
+        .where(GenerationTask.user_id == user_id, GenerationTask.status == TaskStatus.PROCESSING)
         .limit(1)
     )
     result = await db.execute(query)
