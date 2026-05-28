@@ -6,7 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ActionType, User, UserLogs
-from app.modules.generator.costs import set_costs
+from app.modules.generator.costs import get_costs, set_costs
 
 from .schemas import (
     GenerationSettingsResponse,
@@ -21,6 +21,20 @@ from .schemas import (
 )
 
 
+def _build_generation_settings_response(settings: dict[str, int]) -> GenerationSettingsResponse:
+    return GenerationSettingsResponse(
+        base_tokens=settings["base_tokens"],
+        donut_tokens=settings["donut_tokens"],
+        post_cost=settings["post"],
+        image_cost=settings["image"],
+    )
+
+
+async def get_generation_settings(redis: Redis) -> GenerationSettingsResponse:
+    settings = await get_costs(redis)
+    return _build_generation_settings_response(settings)
+
+
 async def update_generation_settings(
     redis: Redis,
     payload: GenerationSettingsUpdateRequest,
@@ -32,12 +46,7 @@ async def update_generation_settings(
         base_tokens=payload.base_tokens,
         donut_tokens=payload.donut_tokens,
     )
-    return GenerationSettingsResponse(
-        base_tokens=settings["base_tokens"],
-        donut_tokens=settings["donut_tokens"],
-        post_cost=settings["post"],
-        image_cost=settings["image"],
-    )
+    return _build_generation_settings_response(settings)
 
 
 def _build_user_item(user: User) -> UsersListItem:

@@ -18,6 +18,7 @@ from .schemas import (
     UsersListResponse,
 )
 from .service import (
+    get_generation_settings,
     get_user_details,
     get_users_page,
     update_generation_settings,
@@ -32,7 +33,15 @@ async def admin_login(payload: AdminLoginRequest):
     return login_admin(payload)
 
 
-@router.patch("/generation-settings", response_model=GenerationSettingsResponse)
+@router.get("/generation-settings", response_model=GenerationSettingsResponse)
+async def get_settings(
+    _: AdminTokenDep,
+    redis_client: Annotated[Redis, Depends(get_redis_client)],
+):
+    return await get_generation_settings(redis_client)
+
+
+@router.post("/generation-settings", response_model=GenerationSettingsResponse)
 async def update_settings(
     payload: GenerationSettingsUpdateRequest,
     _: AdminTokenDep,
