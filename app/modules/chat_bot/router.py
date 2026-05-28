@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
@@ -7,22 +7,22 @@ from loguru import logger
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.clients import AsyncVKApiClient
+from app.core.clients import AIService, AsyncVKApiClient
 from app.core.config import settings
 from app.database.crud import create_user, get_user_by_user_id
-from app.dependencies import get_db, get_redis_client, get_vk_client
+from app.dependencies import get_ai_client, get_db, get_redis_client, get_vk_client
 from app.modules.generator.costs import get_costs
 
-from .handlers import handle_message_sync
+from .handlers import handle_message_async
 
 router = APIRouter()
-executor = ThreadPoolExecutor(max_workers=3)
 
 
 @router.post("", response_class=PlainTextResponse)
 async def vk_callback(
     request: Request,
     vk_client: AsyncVKApiClient = Depends(get_vk_client),
+    ai_client: AIService = Depends(get_ai_client),
     redis_client: Redis = Depends(get_redis_client),
     db: AsyncSession = Depends(get_db),
 ):
@@ -40,11 +40,17 @@ async def vk_callback(
         message_text = data["object"]["message"]["text"]
         attachments = data["object"]["message"]["attachments"]
         if attachments:
-            executor.submit(
-                handle_message_sync, user_id, attachments[0]["link"]["url"], vk_client, redis_client
+            message_text = attachments[0].get("link", {}).get("url", message_text)
+        asyncio.create_task(
+            handle_message_async(
+                user_id,
+                message_text,
+                vk_client,
+                redis_client,
+                ai_client,
+                request.app.state.db.session_factory,
             )
-        else:
-            executor.submit(handle_message_sync, user_id, message_text, vk_client, redis_client)
+        )
         return "ok"
 
     elif event_type in ["donut_subscription_create", "donut_subscription_prolonged"]:

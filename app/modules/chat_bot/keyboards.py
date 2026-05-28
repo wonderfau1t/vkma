@@ -12,7 +12,32 @@ inline_main_menu_keyboard = dumps(
                     },
                     "color": "primary",
                 }
-            ]
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Генерация поста",
+                    },
+                    "color": "secondary",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Генерация изображения",
+                    },
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Баланс",
+                    },
+                    "color": "secondary",
+                }
+            ],
         ],
     }
 )
@@ -28,6 +53,48 @@ main_menu_keyboard = dumps(
                         "label": "Аудит сообщества",
                     },
                     "color": "primary",
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Генерация поста",
+                    },
+                    "color": "secondary",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Генерация изображения",
+                    },
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Баланс",
+                    },
+                    "color": "secondary",
+                }
+            ],
+        ]
+    }
+)
+
+
+generation_cancel_keyboard = dumps(
+    {
+        "buttons": [
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Отмена",
+                    },
+                    "color": "negative",
                 }
             ]
         ]
