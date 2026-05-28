@@ -11,6 +11,7 @@ from app.core.clients import AsyncVKApiClient
 from app.core.config import settings
 from app.database.crud import create_user, get_user_by_user_id
 from app.dependencies import get_db, get_redis_client, get_vk_client
+from app.modules.generator.costs import get_costs
 
 from .handlers import handle_message_sync
 
@@ -47,25 +48,36 @@ async def vk_callback(
         return "ok"
 
     elif event_type in ["donut_subscription_create", "donut_subscription_prolonged"]:
+        costs = await get_costs(redis_client)
         user = await get_user_by_user_id(db, user_id)
         if not user:
-            await create_user(db, user_id)
+            await create_user(
+                db,
+                user_id,
+                balance=costs["donut_tokens"],
+                is_donut=True,
+            )
             return "ok"
         
-        user.balance = 1000
+        user.balance = costs["donut_tokens"]
         user.is_donut = True
         user.last_balance_reset_at = datetime.now(timezone.utc)
         await db.commit()
-        logger.info(f"Webhook: {event_type} для {user_id}. Баланс 1000, дата обновлена.")
+        logger.info(
+            f"Webhook: {event_type} для {user_id}. Баланс {costs['donut_tokens']}, дата обновлена."
+        )
         return "ok"
 
     elif event_type in ["donut_subscription_expired", "donut_subscription_cancelled"]:
+        costs = await get_costs(redis_client)
         user = await get_user_by_user_id(db, user_id)
         if not user:
             return "ok"
-        user.balance = 30
+        user.balance = costs["base_tokens"]
         user.is_donut = False
         user.last_balance_reset_at = datetime.now(timezone.utc)
         await db.commit()
-        logger.info(f"Webhook: {event_type} для {user_id}. Баланс 30, дата обновлена.")
+        logger.info(
+            f"Webhook: {event_type} для {user_id}. Баланс {costs['base_tokens']}, дата обновлена."
+        )
         return "ok"

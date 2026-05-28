@@ -1,4 +1,4 @@
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     DB_USER: str
     DB_PASSWORD: str
     group_id: int
+    default_image_cost: int = Field(default=10, gt=0)
+    default_post_cost: int = Field(default=2, gt=0)
+    default_base_tokens: int = Field(default=30, ge=0)
+    default_donut_tokens: int = Field(default=1000, ge=0)
 
     model_config = SettingsConfigDict(
         env_file=".env",

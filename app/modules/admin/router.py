@@ -1,14 +1,17 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db
+from app.dependencies import get_db, get_redis_client
 
 from .auth import AdminTokenDep, login_admin
 from .schemas import (
     AdminLoginRequest,
     AdminLoginResponse,
+    GenerationSettingsResponse,
+    GenerationSettingsUpdateRequest,
     UserBalanceUpdateRequest,
     UserBalanceUpdateResponse,
     UserDetailsResponse,
@@ -17,6 +20,7 @@ from .schemas import (
 from .service import (
     get_user_details,
     get_users_page,
+    update_generation_settings,
     update_user_balance as update_user_balance_service,
 )
 
@@ -26,6 +30,15 @@ router = APIRouter()
 @router.post("/login", response_model=AdminLoginResponse)
 async def admin_login(payload: AdminLoginRequest):
     return login_admin(payload)
+
+
+@router.patch("/generation-settings", response_model=GenerationSettingsResponse)
+async def update_settings(
+    payload: GenerationSettingsUpdateRequest,
+    _: AdminTokenDep,
+    redis_client: Annotated[Redis, Depends(get_redis_client)],
+):
+    return await update_generation_settings(redis_client, payload)
 
 
 @router.get("/users", response_model=UsersListResponse)

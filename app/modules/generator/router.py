@@ -37,11 +37,19 @@ async def get_balance(
     user_id: VKVerifiedTokenDep,
     db: AsyncSession = Depends(get_db),
     vk_client: AsyncVKApiClient = Depends(get_vk_client),
+    redis_client: Redis = Depends(get_redis_client),
 ):
+    costs = await get_costs(redis_client)
     user = await get_user_by_user_id(db, user_id)
     if not user:
         full_name, avatar = await get_vk_user_profile(vk_client, user_id)
-        user = await create_user(db, user_id, full_name=full_name, avatar=avatar)
+        user = await create_user(
+            db,
+            user_id,
+            full_name=full_name,
+            avatar=avatar,
+            balance=costs["base_tokens"],
+        )
         logger.info(f"Создан новый пользователь: {user_id}")
     elif not user.avatar:
         full_name, avatar = await get_vk_user_profile(vk_client, user_id)
@@ -65,7 +73,7 @@ async def get_balance(
         # ЛОГИКА ОБНОВЛЕНИЯ
         if status_changed or is_time_to_reset:
             # Определяем новый лимит
-            new_balance = 1000 if is_now_donut else 30
+            new_balance = costs["donut_tokens"] if is_now_donut else costs["base_tokens"]
             
             user.balance = new_balance
             user.is_donut = is_now_donut

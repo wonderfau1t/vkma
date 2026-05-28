@@ -1,12 +1,16 @@
 from typing import Literal
 
 from fastapi import HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ActionType, User, UserLogs
+from app.modules.generator.costs import set_costs
 
 from .schemas import (
+    GenerationSettingsResponse,
+    GenerationSettingsUpdateRequest,
     LogsListItem,
     UserBalanceUpdateRequest,
     UserBalanceUpdateResponse,
@@ -15,6 +19,25 @@ from .schemas import (
     UsersListMeta,
     UsersListResponse,
 )
+
+
+async def update_generation_settings(
+    redis: Redis,
+    payload: GenerationSettingsUpdateRequest,
+) -> GenerationSettingsResponse:
+    settings = await set_costs(
+        redis,
+        image=payload.image_cost,
+        post=payload.post_cost,
+        base_tokens=payload.base_tokens,
+        donut_tokens=payload.donut_tokens,
+    )
+    return GenerationSettingsResponse(
+        base_tokens=settings["base_tokens"],
+        donut_tokens=settings["donut_tokens"],
+        post_cost=settings["post"],
+        image_cost=settings["image"],
+    )
 
 
 def _build_user_item(user: User) -> UsersListItem:

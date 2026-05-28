@@ -16,12 +16,15 @@ async def create_user(
     user_id: int,
     full_name: str | None = None,
     avatar: str = "",
+    balance: int = 30,
+    is_donut: bool = False,
 ) -> User:
     user = User(
         id=user_id,
         full_name=full_name or f"Пользователь {user_id}",
         avatar=avatar,
-        balance=30,
+        balance=balance,
+        is_donut=is_donut,
     )
     db.add(user)
     await db.commit()

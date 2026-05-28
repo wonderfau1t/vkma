@@ -21,6 +21,17 @@ class AdminLoginResponse(BaseModel):
     access_token: str
 
 
+class GenerationSettingsUpdateRequest(APIModel):
+    base_tokens: int = Field(ge=0)
+    donut_tokens: int = Field(ge=0)
+    post_cost: int = Field(gt=0)
+    image_cost: int = Field(gt=0)
+
+
+class GenerationSettingsResponse(GenerationSettingsUpdateRequest):
+    pass
+
+
 class UsersListItem(APIModel):
     id: int
     avatar: str
