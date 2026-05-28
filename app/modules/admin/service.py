@@ -1,5 +1,7 @@
+from typing import Literal
+
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ActionType, User, UserLogs
@@ -19,7 +21,7 @@ def _build_user_item(user: User) -> UsersListItem:
     return UsersListItem(
         id=user.id,
         avatar=user.avatar or "",
-        full_name=f"Пользователь {user.id}",
+        full_name=user.full_name,
         registered_at=user.registered_at,
         is_donut=user.is_donut,
         balance=user.balance,
@@ -30,30 +32,36 @@ async def get_users_page(
     db: AsyncSession,
     limit: int = 50,
     offset: int = 0,
+    sort_order: Literal["asc", "desc"] = "desc",
+    is_donut: bool | None = None,
+    search: str | None = None,
 ) -> UsersListResponse:
-    query = (
-        select(User)
-        .order_by(User.registered_at.desc(), User.id.desc())
-        .offset(offset)
-        .limit(limit + 1)
-    )
+    query = select(User)
+
+    if is_donut is not None:
+        query = query.where(User.is_donut == is_donut)
+
+    if search:
+        search_value = search.strip()
+        if search_value:
+            conditions = [User.full_name.ilike(f"%{search_value}%")]
+            if search_value.isdigit():
+                conditions.append(User.id == int(search_value))
+            query = query.where(or_(*conditions))
+
+    if sort_order == "asc":
+        query = query.order_by(User.registered_at.asc(), User.id.asc())
+    else:
+        query = query.order_by(User.registered_at.desc(), User.id.desc())
+
+    query = query.offset(offset).limit(limit + 1)
 
     result = await db.execute(query)
     users = list(result.scalars().all())
     has_more = len(users) > limit
     page_users = users[:limit]
 
-    items = [
-        UsersListItem(
-            id=user.id,
-            avatar=user.avatar or "",
-            full_name=user.full_name,
-            registered_at=user.registered_at,
-            is_donut=user.is_donut,
-            balance=user.balance,
-        )
-        for user in page_users
-    ]
+    items = [_build_user_item(user) for user in page_users]
 
     return UsersListResponse(
         items=items,
@@ -90,14 +98,7 @@ async def get_user_details(
     ]
 
     return UserDetailsResponse(
-        **UsersListItem(
-            id=user.id,
-            avatar=user.avatar or "",
-            full_name=user.full_name,
-            registered_at=user.registered_at,
-            is_donut=user.is_donut,
-            balance=user.balance,
-        ).model_dump(),
+        **_build_user_item(user).model_dump(),
         last_balance_reset_at=user.last_balance_reset_at,
         logs=logs,
     )
