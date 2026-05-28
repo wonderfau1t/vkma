@@ -2,8 +2,38 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AIService, AsyncVKApiClient
+from app.core.config import settings
 from app.database.crud import update_task
 from app.database.models import TaskStatus, User
+
+
+async def get_vk_user_profile(vk_client: AsyncVKApiClient, user_id: int) -> tuple[str, str]:
+    fallback_name = f"Пользователь {user_id}"
+
+    try:
+        response = await vk_client.get(
+            "users.get",
+            {
+                "user_ids": str(user_id),
+                "fields": "photo_100",
+            },
+            token=settings.vk_service_token.get_secret_value(),
+        )
+    except Exception as exc:
+        logger.warning(f"Не удалось получить профиль VK для {user_id}: {exc}")
+        return fallback_name, ""
+
+    profiles = response.get("response", [])
+    if not profiles:
+        return fallback_name, ""
+
+    profile = profiles[0]
+    first_name = profile.get("first_name", "")
+    last_name = profile.get("last_name", "")
+    full_name = f"{first_name} {last_name}".strip() or fallback_name
+    avatar = profile.get("photo_100") or ""
+
+    return full_name, avatar
 
 
 async def is_donut(vk_client: AsyncVKApiClient, group_id: int, user_id: int):

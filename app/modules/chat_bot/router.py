@@ -54,7 +54,7 @@ async def vk_callback(
         
         user.balance = 1000
         user.is_donut = True
-        user.last_reset_at = datetime.now(timezone.utc)
+        user.last_balance_reset_at = datetime.now(timezone.utc)
         await db.commit()
         logger.info(f"Webhook: {event_type} для {user_id}. Баланс 1000, дата обновлена.")
         return "ok"
@@ -65,7 +65,7 @@ async def vk_callback(
             return "ok"
         user.balance = 30
         user.is_donut = False
-        user.last_reset_at = datetime.now(timezone.utc)
+        user.last_balance_reset_at = datetime.now(timezone.utc)
         await db.commit()
         logger.info(f"Webhook: {event_type} для {user_id}. Баланс 30, дата обновлена.")
         return "ok"

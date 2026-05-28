@@ -27,7 +27,7 @@ from app.modules.admin.auth import AdminTokenDep
 
 from .costs import get_costs, set_costs
 from .models import GenerateRequest, UpdateCostsRequest
-from .service import is_donut, process_generation
+from .service import get_vk_user_profile, is_donut, process_generation
 
 router = APIRouter()
 
@@ -40,12 +40,20 @@ async def get_balance(
 ):
     user = await get_user_by_user_id(db, user_id)
     if not user:
-        user = await create_user(db, user_id)
+        full_name, avatar = await get_vk_user_profile(vk_client, user_id)
+        user = await create_user(db, user_id, full_name=full_name, avatar=avatar)
         logger.info(f"Создан новый пользователь: {user_id}")
+    elif not user.avatar:
+        full_name, avatar = await get_vk_user_profile(vk_client, user_id)
+        user.full_name = full_name
+        user.avatar = avatar
+        await db.commit()
 
     now = datetime.now(timezone.utc)
     # Порог обновления (30 дней)
-    is_time_to_reset = user.last_reset_at is None or (now - user.last_reset_at) >= timedelta(days=30)
+    is_time_to_reset = user.last_balance_reset_at is None or (
+        now - user.last_balance_reset_at
+    ) >= timedelta(days=30)
 
     try:
         # Получаем актуальный статус из VK
@@ -61,7 +69,7 @@ async def get_balance(
             
             user.balance = new_balance
             user.is_donut = is_now_donut
-            user.last_reset_at = now
+            user.last_balance_reset_at = now
             
             await db.commit()
             
@@ -74,7 +82,9 @@ async def get_balance(
     return {
         "balance": user.balance,
         "isDonut": user.is_donut,
-        "nextResetAt": (user.last_reset_at + timedelta(days=30)) if user.last_reset_at else None
+        "nextResetAt": (user.last_balance_reset_at + timedelta(days=30))
+        if user.last_balance_reset_at
+        else None,
     }
 
 
