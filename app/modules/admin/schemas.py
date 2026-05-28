@@ -24,8 +24,8 @@ class AdminLoginResponse(BaseModel):
 class GenerationSettingsUpdateRequest(APIModel):
     base_tokens: int = Field(ge=0)
     donut_tokens: int = Field(ge=0)
-    post_cost: int = Field(gt=0)
-    image_cost: int = Field(gt=0)
+    post_cost: int = Field(ge=0)
+    image_cost: int = Field(ge=0)
 
 
 class GenerationSettingsResponse(GenerationSettingsUpdateRequest):
