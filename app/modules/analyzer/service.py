@@ -90,8 +90,8 @@ async def fetch_basic_group_info(
         result_of_check=ResultOfCheck(
             contacts=bool(data.get("contacts")),
             cover=bool(data.get("cover", {}).get("enabled")),
-            clips=(data["counters"].get("clips", 0) > 0),
-            # clips=False,
+            # clips=(data["counters"].get("clips", 0) > 0),
+            clips=False,
             screen_name=bool(is_custom_screen_name(data.get("screen_name"))),
             description=bool(data.get("description")),
             fixed_post=bool(data.get("fixed_post")),
