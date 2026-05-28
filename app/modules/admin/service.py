@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import ActionType, User, UserLogs
 
 from .schemas import (
+    LogsListItem,
     UserBalanceUpdateRequest,
     UserBalanceUpdateResponse,
     UserDetailsResponse,
@@ -71,6 +72,23 @@ async def get_user_details(
             detail="Пользователь не найден",
         )
 
+    logs_result = await db.execute(
+        select(UserLogs)
+        .where(UserLogs.user_id == user.id)
+        .order_by(UserLogs.created_at.desc(), UserLogs.id.desc())
+    )
+    logs = [
+        LogsListItem(
+            id=log.id,
+            action=log.action,
+            amount=log.amount,
+            change=log.change,
+            comment=log.comment,
+            datetime=log.created_at,
+        )
+        for log in logs_result.scalars().all()
+    ]
+
     return UserDetailsResponse(
         **UsersListItem(
             id=user.id,
@@ -81,6 +99,7 @@ async def get_user_details(
             balance=user.balance,
         ).model_dump(),
         last_balance_reset_at=user.last_balance_reset_at,
+        logs=logs,
     )
 
 

@@ -41,8 +41,18 @@ class UsersListResponse(APIModel):
     meta: UsersListMeta
 
 
+class LogsListItem(APIModel):
+    id: int
+    action: Literal["increase", "decrease", "set"]
+    amount: int = Field(ge=0)
+    change: str
+    comment: str | None = None
+    datetime: datetime
+
+
 class UserDetailsResponse(UsersListItem):
     last_balance_reset_at: datetime
+    logs: List[LogsListItem]
 
 
 class UserBalanceUpdateRequest(APIModel):
