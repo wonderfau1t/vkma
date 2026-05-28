@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     vk_service_token: SecretStr
     vk_group_confirmation_token: SecretStr
     ai_service_api_key: SecretStr
-    admin_secret: SecretStr
+    admin_login: str = "admin"
+    admin_password: SecretStr
     vk_app_id: int
     DB_HOST: str
     DB_PORT: int

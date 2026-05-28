@@ -1,0 +1,55 @@
+from datetime import datetime
+from typing import List, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+
+class APIModel(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        alias_generator=to_camel,
+    )
+
+
+class AdminLoginRequest(BaseModel):
+    login: str
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    access_token: str
+
+
+class UsersListItem(APIModel):
+    id: int
+    avatar: str
+    full_name: str
+    registered_at: datetime
+    is_donut: bool
+    balance: int
+
+
+class UsersListMeta(APIModel):
+    limit: int
+    offset: int
+    has_more: bool
+
+
+class UsersListResponse(APIModel):
+    items: List[UsersListItem]
+    meta: UsersListMeta
+
+
+class UserDetailsResponse(UsersListItem):
+    last_balance_reset_at: datetime
+
+
+class UserBalanceUpdateRequest(APIModel):
+    action: Literal["increase", "decrease", "set"]
+    amount: int = Field(ge=0)
+    comment: str | None = None
+
+
+class UserBalanceUpdateResponse(APIModel):
+    balance: int

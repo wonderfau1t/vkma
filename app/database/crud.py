@@ -11,8 +11,8 @@ async def get_user_by_user_id(db: AsyncSession, user_id: int) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def create_user(db: AsyncSession, user_id: int) -> User:
-    user = User(id=user_id, balance=30)
+async def create_user(db: AsyncSession, user_id: int, avatar: str = "") -> User:
+    user = User(id=user_id, avatar=avatar, balance=30)
     db.add(user)
     await db.commit()
     await db.refresh(user)

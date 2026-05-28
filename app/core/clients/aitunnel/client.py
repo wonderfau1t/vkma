@@ -24,11 +24,15 @@ class AIService:
         reference_image: bytes | None = None,
         aspect_ratio: str | None = None,
     ):
-        extra = {
-            "image_config": {
-                "aspect_ratio": aspect_ratio,
+        extra = (
+            {
+                "image_config": {
+                    "aspect_ratio": aspect_ratio,
+                }
             }
-        } if aspect_ratio else {}
+            if aspect_ratio
+            else {}
+        )
         logger.info(
             f"Генерация изображения [{image_name}]: "
             f"референс={'да' if reference_image else 'нет'}, "

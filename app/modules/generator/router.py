@@ -11,7 +11,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clients import AIService, AsyncVKApiClient
-from app.core.clients.vk_api.auth import AdminSecretDep, VKVerifiedTokenDep
+from app.core.clients.vk_api.auth import VKVerifiedTokenDep
 from app.core.config import settings
 from app.database.crud import (
     create_task,
@@ -23,6 +23,7 @@ from app.database.crud import (
 )
 from app.database.models import GenerationType, TaskStatus
 from app.dependencies import get_ai_client, get_db, get_redis_client, get_vk_client
+from app.modules.admin.auth import AdminTokenDep
 
 from .costs import get_costs, set_costs
 from .models import GenerateRequest, UpdateCostsRequest
@@ -212,7 +213,7 @@ async def get_generation_costs(redis_client: Redis = Depends(get_redis_client)):
 @router.patch("/costs")
 async def update_generation_costs(
     data: UpdateCostsRequest,
-    _: AdminSecretDep,
+    _: AdminTokenDep,
     redis_client: Redis = Depends(get_redis_client),
 ):
     await set_costs(redis_client, image=data.image, post=data.post)

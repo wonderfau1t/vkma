@@ -10,6 +10,7 @@ from app.core.clients import AIService, AsyncVKApiClient
 from app.core.config import settings
 from app.core.logger import setup_logging
 from app.database.db_helper import DBHelper
+from app.database.models import Base
 from app.modules.admin.router import router as admin_router
 from app.modules.analyzer.router import router as analyzer_router
 from app.modules.chat_bot.router import router as chat_bot_router
@@ -45,6 +46,8 @@ async def lifespan(app: FastAPI):
         False,
         False,
     )
+    async with app.state.db.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     yield
 
