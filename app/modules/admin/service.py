@@ -5,10 +5,18 @@ from redis.asyncio import Redis
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import ActionType, User, UserLogs
+from app.database.models import (
+    ActionType,
+    GenerationTask,
+    GenerationType,
+    TaskStatus,
+    User,
+    UserLogs,
+)
 from app.modules.generator.costs import get_costs, set_costs
 
 from .schemas import (
+    GenerationHistoryItem,
     GenerationSettingsResponse,
     GenerationSettingsUpdateRequest,
     LogsListItem,
@@ -19,6 +27,8 @@ from .schemas import (
     UsersListMeta,
     UsersListResponse,
 )
+
+IMAGE_RESULT_BASE_URL = "https://vk.wonderrfau1t.site/images"
 
 
 def _build_generation_settings_response(settings: dict[str, int]) -> GenerationSettingsResponse:
@@ -129,10 +139,37 @@ async def get_user_details(
         for log in logs_result.scalars().all()
     ]
 
+    tasks_result = await db.execute(
+        select(GenerationTask)
+        .where(GenerationTask.user_id == user.id)
+        .order_by(GenerationTask.created_at.desc(), GenerationTask.id.desc())
+    )
+    generation_history = []
+    for task in tasks_result.scalars().all():
+        is_success = task.status == TaskStatus.SUCCESS
+        is_failed = task.status == TaskStatus.FAILED
+        result = task.result if is_success else None
+        if result and task.type == GenerationType.IMAGE:
+            result = f"{IMAGE_RESULT_BASE_URL}/{result}"
+
+        generation_history.append(
+            GenerationHistoryItem(
+                id=task.id,
+                prompt=task.prompt,
+                datetime=task.created_at,
+                type=task.type,
+                status=task.status,
+                cost_rub=task.cost_rub,
+                result=result,
+                error=task.result if is_failed else None,
+            )
+        )
+
     return UserDetailsResponse(
         **_build_user_item(user).model_dump(),
         last_balance_reset_at=user.last_balance_reset_at,
         logs=logs,
+        generation_history=generation_history,
     )
 
 

@@ -61,9 +61,21 @@ class LogsListItem(APIModel):
     datetime: datetime
 
 
+class GenerationHistoryItem(APIModel):
+    id: str
+    prompt: str
+    datetime: datetime
+    type: Literal["post", "image"]
+    status: Literal["processing", "success", "failed"]
+    cost_rub: float | None = Field(default=None, ge=0)
+    result: str | None = None
+    error: str | None = None
+
+
 class UserDetailsResponse(UsersListItem):
     last_balance_reset_at: datetime
     logs: List[LogsListItem]
+    generation_history: List[GenerationHistoryItem]
 
 
 class UserBalanceUpdateRequest(APIModel):
