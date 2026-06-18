@@ -123,13 +123,13 @@ generation_cancel_keyboard = dumps(
                     },
                     "color": "secondary",
                 },
-                {
-                    "action": {
-                        "type": "text",
-                        "label": "Стоп",
-                    },
-                    "color": "negative",
-                }
+                # {
+                #     "action": {
+                #         "type": "text",
+                #         "label": "Стоп",
+                #     },
+                #     "color": "negative",
+                # }
             ]
         ]
     }
@@ -144,17 +144,17 @@ inline_group_analysis_keyboard = dumps(
                 {
                     "action": {
                         "type": "text",
-                        "label": "Выйти из аудита",
+                        "label": "Назад",
                     },
                     "color": "primary",
                 },
-                {
-                    "action": {
-                        "type": "text",
-                        "label": "Стоп",
-                    },
-                    "color": "negative",
-                }
+                # {
+                #     "action": {
+                #         "type": "text",
+                #         "label": "Стоп",
+                #     },
+                #     "color": "negative",
+                # }
             ]
         ],
     }
@@ -167,17 +167,17 @@ to_main_menu_keyboard = dumps(
                 {
                     "action": {
                         "type": "text",
-                        "label": "Выйти из аудита",
+                        "label": "Назад",
                     },
                     "color": "primary",
                 },
-                {
-                    "action": {
-                        "type": "text",
-                        "label": "Стоп",
-                    },
-                    "color": "negative",
-                }
+                # {
+                #     "action": {
+                #         "type": "text",
+                #         "label": "Стоп",
+                #     },
+                #     "color": "negative",
+                # }
             ]
         ]
     }
