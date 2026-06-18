@@ -2,7 +2,6 @@ import asyncio
 import inspect
 import random
 import uuid
-from pathlib import Path
 
 from loguru import logger
 from redis.asyncio import Redis
@@ -41,7 +40,6 @@ from .utils import (
     save_image_reference,
     send_message,
     set_user_state,
-    upload_message_photo,
 )
 
 handlers = []
@@ -241,27 +239,15 @@ async def _run_generation(
                 task.id,
                 reference_image=reference_image,
             )
-            result_attachment = await upload_message_photo(
-                user_id,
-                Path("media") / result,
-                vk_client,
-            )
-            result_message = "Готово! Изображение прикрепил к сообщению."
+            result_message = f"Готово: https://vk.wonderrfau1t.site/images/{result}"
         else:
             result, cost_rub = await ai_client.generate_post(prompt, task.id)
             result_message = result
-            result_attachment = None
 
         async with db_session_factory() as db:
             await update_task(db, task.id, TaskStatus.SUCCESS, result, cost_rub)
 
-        await send_message(
-            user_id,
-            result_message,
-            vk_client,
-            main_menu_keyboard,
-            result_attachment,
-        )
+        await send_message(user_id, result_message, vk_client, main_menu_keyboard)
     except Exception as exc:
         await _refund_generation_cost(
             db_session_factory,

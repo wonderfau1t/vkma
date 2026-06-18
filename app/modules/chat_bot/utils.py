@@ -1,11 +1,9 @@
 import re
 from math import ceil
-from pathlib import Path
 
 from redis.asyncio import Redis
 
 from app.core.clients import AsyncVKApiClient
-from app.core.config import settings
 from app.modules.analyzer.models import APIResponse
 
 from .states import UserState
@@ -71,40 +69,6 @@ async def get_image_reference(user_id: int, redis_client: Redis) -> bytes | None
 
 async def clear_image_reference(user_id: int, redis_client: Redis) -> None:
     await redis_client.delete(f"user_image_reference:{user_id}")
-
-
-async def upload_message_photo(
-    user_id: int,
-    image_path: Path,
-    vk_client: AsyncVKApiClient,
-) -> str:
-    token = settings.vk_group_token.get_secret_value()
-    upload_server = await vk_client.get(
-        "photos.getMessagesUploadServer",
-        {"peer_id": user_id},
-        token=token,
-    )
-    upload_result = await vk_client.upload_file(
-        upload_server["response"]["upload_url"],
-        "photo",
-        image_path.name,
-        image_path.read_bytes(),
-        "image/png",
-    )
-    saved = await vk_client.post(
-        "photos.saveMessagesPhoto",
-        {
-            "photo": upload_result["photo"],
-            "server": upload_result["server"],
-            "hash": upload_result["hash"],
-        },
-        token=token,
-    )
-    photo = saved["response"][0]
-    attachment = f"photo{photo['owner_id']}_{photo['id']}"
-    if access_key := photo.get("access_key"):
-        attachment += f"_{access_key}"
-    return attachment
 
 
 async def set_user_state(user_id: int, state: UserState, redis_client: Redis) -> None:
