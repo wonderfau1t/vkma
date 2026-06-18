@@ -66,7 +66,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://tunnel.wonderrfau1t.site", "https://vk.com", "https://vk.ru"],
+    allow_origins=["https://tunnel.wonderrfau1t.site", "https://vk.com", "https://vk.ru",
+                   "https://prod-app52612592-031eae25d36f.pages-ac.vk-apps.com/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
