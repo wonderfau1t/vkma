@@ -92,10 +92,11 @@ main_menu_keyboard = dumps(
             [
                 {
                     "action": {
-                        "type": "text",
+                        "type": "open_link",
+                        "link": "https://vk.com/club228359093?w=donut_payment-228359093&levelId=2855",
                         "label": "Добавить генераций",
                     },
-                    "color": "secondary",
+                    "color": "positive",
                 }
             ],
             [
