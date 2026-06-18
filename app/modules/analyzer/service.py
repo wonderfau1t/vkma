@@ -11,8 +11,8 @@ from .utils import format_time
 
 MESSAGES = json.load(open("app/modules/analyzer/messages.json", "r", encoding="utf-8"))
 
-GOOD_SCORE = 8.34
-NORMAL_SCORE = 4.17
+GOOD_SCORE = 10
+NORMAL_SCORE = 5
 
 
 def build_analysis_response(group_info: GroupInfo) -> APIResponse:
@@ -90,13 +90,10 @@ async def fetch_basic_group_info(
         result_of_check=ResultOfCheck(
             contacts=bool(data.get("contacts")),
             cover=bool(data.get("cover", {}).get("enabled")),
-            # clips=(data["counters"].get("clips", 0) > 0),
-            clips=False,
             screen_name=bool(is_custom_screen_name(data.get("screen_name"))),
             description=bool(data.get("description")),
             fixed_post=bool(data.get("fixed_post")),
             market=bool(data.get("market", {}).get("enabled")),
-            status=is_online,
             reposts=None,
             hashtags=None,
             average_time_between_posts=None,
@@ -182,6 +179,17 @@ def _evaluate_field(field: str, value: Any, messages: dict) -> Tuple[str, Parame
     if field == "er":
         return _evaluate_er(value, messages)
 
+    if field in ["reposts", "hashtags"]:
+        if value:
+            param = Parameter(
+                id=field, title=messages[field]["title"], description=messages[field]["negative"]
+            )
+            return "bad", param, 0
+        param = Parameter(
+            id=field, title=messages[field]["title"], description=messages[field]["positive"]
+        )
+        return "good", param, GOOD_SCORE
+
     # Все остальные поля — обычные bool
     if value:
         param = Parameter(
@@ -231,7 +239,7 @@ def _evaluate_average_time(value: dict, messages: dict) -> Tuple[str, Parameter,
     param = Parameter(
         id="average_time_between_posts",
         title=messages["average_time_between_posts"]["title"],
-        description=time_str + messages["average_time_between_posts"]["low"],
+        description=time_str + messages["average_time_between_posts"]["high"],
     )
 
     return "normal", param, 0.0

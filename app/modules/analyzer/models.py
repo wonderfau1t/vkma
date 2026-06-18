@@ -6,12 +6,10 @@ from typing import List
 class ResultOfCheck:
     contacts: bool
     cover: bool
-    clips: bool
     screen_name: bool
     description: bool
     fixed_post: bool
     market: bool
-    status: bool
     reposts: bool | None
     hashtags: bool | None
     average_time_between_posts: dict | None

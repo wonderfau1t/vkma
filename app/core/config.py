@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     vk_protected_key: SecretStr
     vk_service_token: SecretStr
     vk_group_confirmation_token: SecretStr
+    vk_callback_secret: SecretStr | None = None
     ai_service_api_key: SecretStr
     admin_login: str = "admin"
     admin_password: SecretStr
