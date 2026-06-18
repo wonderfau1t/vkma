@@ -259,8 +259,8 @@ async def start_handler(
 ):
     await set_user_state(user_id, UserState.IDLE, redis_client)
     response = (
-        "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту."
-        "Помогу вам проверить 🔍 оформление сообщества ВКонтакте и сгенерирую контент для вашей аудитории (Напишу посты и изображения)"
+        "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту.\n"
+        "Помогу вам проверить 🔍 оформление сообщества ВКонтакте и сгенерирую контент для вашей аудитории (Напишу посты и изображения)\n"
         "Давайте начнем?! Пожалуйста, выберите интересующий пункт 👇"
     )
     await send_message(
@@ -294,7 +294,7 @@ async def audit_handler(
         user_id=user_id,
         message=response,
         vk_client=vk_client,
-        keyboard=inline_group_analysis_keyboard,
+        # keyboard=inline_group_analysis_keyboard,
     )
 
 
@@ -355,12 +355,12 @@ async def group_link_handler(
 
     pivot = len(response_messages) // 2
     await send_message(user_id, "".join(response_messages[:pivot]), vk_client)
-    await send_message(user_id, "".join(response_messages[pivot:]), vk_client, main_menu_keyboard)
+    await send_message(user_id, "".join(response_messages[pivot:]), vk_client)
     await send_message(
         user_id,
         "Выберите следующий интересующий пункт 👇",
         vk_client,
-        inline_main_menu_keyboard,
+        main_menu_keyboard,
     )
     await set_user_state(user_id, UserState.IDLE, redis_client)
 
@@ -398,7 +398,7 @@ async def post_generation_start_handler(
     await set_user_state(user_id, UserState.AWAITING_POST_PROMPT, redis_client)
     await send_message(
         user_id,
-        "Ваня готов к работе 😎 На какую тему будем писать? ✍\nЧтобы я подготовил пост, задайте правильный промт в формате: "
+        "Ваня готов к работе 😎 На какую тему будем писать? ✍\nЧтобы я подготовил пост, задайте правильный промт в формате:\n"
         'Роль (ты опытный специалист в..)+ Задача (напиши пост на тему...)+ Стиль и ограничения (Дружелюбный/официальный и др, не используй слова ***, избегай банальных советов вроде "просто начни" и т.п.) + критерии хорошего результата (Опишите, каким должен быть итоговый текст: Экспертный, продающий, с цепляющим заголовком, с призывом к действию/вопросом).',
         vk_client,
         generation_cancel_keyboard,
@@ -419,7 +419,7 @@ async def image_generation_start_handler(
     await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
     await send_message(
         user_id,
-        "Ваня готов к работе 😎 Что будем создавать?"
+        "Ваня готов к работе 😎 Что будем создавать?\n"
         "📸 Чтобы я подготовил для вас изображение, задайте правильный промт в формате: "
         "[Что изображено] + [Стиль] + [Цвета] + [Композиция/Расположение объектов] + [Текст, если нужен] + [Формат: 1:1, 16:9, 9:16, 21:9, 5:4 и др]. Если нужно, прикрепите фото или референс.",
         vk_client,
