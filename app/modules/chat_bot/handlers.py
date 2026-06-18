@@ -281,12 +281,12 @@ async def audit_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await send_message(
-        user_id=user_id,
-        message="Бот переходит в режим аудита",
-        vk_client=vk_client,
-        keyboard=to_main_menu_keyboard,
-    )
+    # await send_message(
+    #     user_id=user_id,
+    #     message="Бот переходит в режим аудита",
+    #     vk_client=vk_client,
+    #     keyboard=to_main_menu_keyboard,
+    # )
 
     response = "🔍 Перехожу в режим аудита. Пожалуйста, пришлите ссылку на ваше сообщество, которое хотите проверить."
     await set_user_state(user_id, UserState.AWAITING_LINK, redis_client)
@@ -294,7 +294,7 @@ async def audit_handler(
         user_id=user_id,
         message=response,
         vk_client=vk_client,
-        # keyboard=inline_group_analysis_keyboard,
+        keyboard=to_main_menu_keyboard,
     )
 
 
@@ -427,8 +427,8 @@ async def image_generation_start_handler(
     )
 
 
-@message_handler(user_state=UserState.AWAITING_POST_PROMPT, text="отмена")
-@message_handler(user_state=UserState.AWAITING_IMAGE_PROMPT, text="отмена")
+@message_handler(user_state=UserState.AWAITING_POST_PROMPT, text="назад")
+@message_handler(user_state=UserState.AWAITING_IMAGE_PROMPT, text="назад")
 async def generation_cancel_handler(
     user_id: int,
     message_text: str,
@@ -438,7 +438,7 @@ async def generation_cancel_handler(
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
     await set_user_state(user_id, UserState.IDLE, redis_client)
-    await send_message(user_id, "Генерация отменена.", vk_client, main_menu_keyboard)
+    await send_message(user_id, "Возращаюсь назад", vk_client, main_menu_keyboard)
 
 
 @message_handler(user_state=UserState.AWAITING_POST_PROMPT)
