@@ -259,8 +259,8 @@ async def start_handler(
 ):
     await set_user_state(user_id, UserState.IDLE, redis_client)
     response = (
-        "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту.\n"
-        "Помогу вам проверить 🔍 оформление сообщества ВКонтакте и сгенерирую контент для вашей аудитории (Напишу посты и изображения)\n"
+        "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту.\n\n"
+        "Помогу вам проверить 🔍 оформление сообщества ВКонтакте и сгенерирую контент для вашей аудитории (Напишу посты и изображения)\n\n"
         "Давайте начнем?! Пожалуйста, выберите интересующий пункт 👇"
     )
     await send_message(
@@ -307,10 +307,7 @@ async def main_menu_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    response = (
-        "Выхожу из состояния аудита. Если хотите начать аудит сообщества, "
-        'введите в любой момент команду "Аудит"'
-    )
+    response = "Возвращаюсь назад"
     await set_user_state(user_id, UserState.IDLE, redis_client)
     await send_message(user_id, response, vk_client, main_menu_keyboard)
 
