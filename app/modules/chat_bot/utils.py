@@ -6,6 +6,8 @@ from redis.asyncio import Redis
 from app.core.clients import AsyncVKApiClient
 from app.modules.analyzer.models import APIResponse
 
+from .states import UserState
+
 
 def extract_group_id(link):
     match = re.search(r"(?:m\.)?(?:vk\.(?:com|ru))/(.*)", link)
@@ -27,13 +29,19 @@ async def send_message(
     await vk_client.post("messages.send", params)
 
 
-async def set_user_state(user_id: int, state: str, redis_client: Redis):
-    await redis_client.set(f"user_state:{user_id}", state)
+async def set_user_state(user_id: int, state: UserState, redis_client: Redis) -> None:
+    await redis_client.set(f"user_state:{user_id}", state.value)
 
 
-async def get_user_state(user_id: int, redis_client: Redis):
+async def get_user_state(user_id: int, redis_client: Redis) -> UserState:
     state = await redis_client.get(f"user_state:{user_id}")
-    return state.decode("utf-8") if state else "idle"
+    if not state:
+        return UserState.INACTIVE
+
+    try:
+        return UserState(state.decode("utf-8"))
+    except ValueError:
+        return UserState.INACTIVE
 
 
 def generate_message_text(data: APIResponse) -> list:

@@ -36,6 +36,22 @@ inline_main_menu_keyboard = dumps(
                         "label": "Баланс",
                     },
                     "color": "secondary",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Добавить генераций",
+                    },
+                    "color": "secondary",
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Стоп",
+                    },
+                    "color": "negative",
                 }
             ],
         ],
@@ -80,6 +96,15 @@ main_menu_keyboard = dumps(
                     "color": "secondary",
                 }
             ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Стоп",
+                    },
+                    "color": "negative",
+                }
+            ],
         ]
     }
 )
@@ -93,6 +118,13 @@ generation_cancel_keyboard = dumps(
                     "action": {
                         "type": "text",
                         "label": "Отмена",
+                    },
+                    "color": "negative",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Стоп",
                     },
                     "color": "negative",
                 }
@@ -113,6 +145,13 @@ inline_group_analysis_keyboard = dumps(
                         "label": "Выйти из аудита",
                     },
                     "color": "primary",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Стоп",
+                    },
+                    "color": "negative",
                 }
             ]
         ],
@@ -129,6 +168,13 @@ to_main_menu_keyboard = dumps(
                         "label": "Выйти из аудита",
                     },
                     "color": "primary",
+                },
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Стоп",
+                    },
+                    "color": "negative",
                 }
             ]
         ]

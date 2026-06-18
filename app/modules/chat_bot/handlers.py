@@ -21,12 +21,14 @@ from app.modules.generator.costs import get_costs
 from app.modules.generator.service import get_vk_user_profile, is_donut
 
 from .keyboards import (
+    empty_keyboard,
     generation_cancel_keyboard,
     inline_group_analysis_keyboard,
     inline_main_menu_keyboard,
     main_menu_keyboard,
     to_main_menu_keyboard,
 )
+from .states import UserState
 from .utils import (
     extract_group_id,
     generate_message_text,
@@ -38,7 +40,7 @@ from .utils import (
 handlers = []
 
 
-def message_handler(user_state=None, text=None):
+def message_handler(user_state: UserState | None = None, text: str | None = None):
     """Декоратор для регистрации обработчиков сообщений"""
 
     def decorator(func):
@@ -67,6 +69,16 @@ async def handle_message_async(
         state = await get_user_state(user_id, redis_client)
         normalized_text = message_text.lower().strip()
 
+        if normalized_text == "стоп":
+            await set_user_state(user_id, UserState.INACTIVE, redis_client)
+            await send_message(
+                user_id,
+                "Договорились, Останавливаюсь! 👌😊 Если будет нужна помощь, просто напишите: Привет, Ваня!",
+                vk_client,
+                empty_keyboard,
+            )
+            return
+
         for handler in handlers:
             if handler["user_state"] == state and (
                 handler["text"] is None or handler["text"] == normalized_text
@@ -83,7 +95,7 @@ async def handle_message_async(
                     await result
                 return
 
-        if state == "idle":
+        if state == UserState.IDLE:
             await send_message(
                 user_id,
                 "Выберите действие в меню.",
@@ -92,7 +104,7 @@ async def handle_message_async(
             )
     except Exception as exc:
         logger.exception(f"Ошибка обработки сообщения чат-бота для {user_id}: {exc}")
-        await set_user_state(user_id, "idle", redis_client)
+        await set_user_state(user_id, UserState.IDLE, redis_client)
         await send_message(
             user_id,
             "Произошла ошибка. Попробуйте ещё раз или выберите действие в меню.",
@@ -235,7 +247,8 @@ async def _run_generation(
         )
 
 
-@message_handler(user_state="idle", text="начать")
+@message_handler(user_state=UserState.INACTIVE, text="привет, ваня")
+@message_handler(user_state=UserState.INACTIVE, text="начать")
 async def start_handler(
     user_id: int,
     message_text: str,
@@ -244,9 +257,11 @@ async def start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    await set_user_state(user_id, UserState.IDLE, redis_client)
     response = (
-        "Здравствуйте! Я помогу вам проверить оформление сообщества ВКонтакте "
-        "по нескольким параметрам. Давайте начнем!"
+        "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту."
+        "Помогу вам проверить 🔍 оформление сообщества ВКонтакте и сгенерирую контент для вашей аудитории (Напишу посты и изображения)"
+        "Давайте начнем?! Пожалуйста, выберите интересующий пункт 👇"
     )
     await send_message(
         user_id=user_id,
@@ -256,8 +271,8 @@ async def start_handler(
     )
 
 
-@message_handler(user_state="idle", text="аудит сообщества")
-@message_handler(user_state="idle", text="аудит")
+@message_handler(user_state=UserState.IDLE, text="аудит сообщества")
+@message_handler(user_state=UserState.IDLE, text="аудит")
 async def audit_handler(
     user_id: int,
     message_text: str,
@@ -273,8 +288,8 @@ async def audit_handler(
         keyboard=to_main_menu_keyboard,
     )
 
-    response = "Для аудита пришлите, пожалуйста, ссылку на сообщество, которое хотите проверить."
-    await set_user_state(user_id, "awaiting_link", redis_client)
+    response = "🔍 Перехожу в режим аудита. Пожалуйста, пришлите ссылку на ваше сообщество, которое хотите проверить."
+    await set_user_state(user_id, UserState.AWAITING_LINK, redis_client)
     await send_message(
         user_id=user_id,
         message=response,
@@ -283,7 +298,7 @@ async def audit_handler(
     )
 
 
-@message_handler(user_state="awaiting_link", text="выйти из аудита")
+@message_handler(user_state=UserState.AWAITING_LINK, text="выйти из аудита")
 async def main_menu_handler(
     user_id: int,
     message_text: str,
@@ -293,15 +308,15 @@ async def main_menu_handler(
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
     response = (
-        'Выхожу из состояния аудита. Если хотите начать аудит сообщества, '
+        "Выхожу из состояния аудита. Если хотите начать аудит сообщества, "
         'введите в любой момент команду "Аудит"'
     )
-    await set_user_state(user_id, "idle", redis_client)
+    await set_user_state(user_id, UserState.IDLE, redis_client)
     await send_message(user_id, response, vk_client, main_menu_keyboard)
 
 
 @message_handler(
-    user_state="awaiting_link",
+    user_state=UserState.AWAITING_LINK,
 )
 async def group_link_handler(
     user_id: int,
@@ -343,14 +358,14 @@ async def group_link_handler(
     await send_message(user_id, "".join(response_messages[pivot:]), vk_client, main_menu_keyboard)
     await send_message(
         user_id,
-        '🔎 Если хотите проанализировать другое сообщество, то нажмите на "Аудит сообщества"',
+        "Выберите следующий интересующий пункт 👇",
         vk_client,
         inline_main_menu_keyboard,
     )
-    await set_user_state(user_id, "idle", redis_client)
+    await set_user_state(user_id, UserState.IDLE, redis_client)
 
 
-@message_handler(user_state="idle", text="баланс")
+@message_handler(user_state=UserState.IDLE, text="баланс")
 async def balance_handler(
     user_id: int,
     message_text: str,
@@ -370,8 +385,8 @@ async def balance_handler(
     )
 
 
-@message_handler(user_state="idle", text="генерация поста")
-@message_handler(user_state="idle", text="пост")
+@message_handler(user_state=UserState.IDLE, text="генерация поста")
+@message_handler(user_state=UserState.IDLE, text="пост")
 async def post_generation_start_handler(
     user_id: int,
     message_text: str,
@@ -380,18 +395,19 @@ async def post_generation_start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await set_user_state(user_id, "awaiting_post_prompt", redis_client)
+    await set_user_state(user_id, UserState.AWAITING_POST_PROMPT, redis_client)
     await send_message(
         user_id,
-        "Пришлите тему, тезисы или задачу для поста.",
+        "Ваня готов к работе 😎 На какую тему будем писать? ✍\nЧтобы я подготовил пост, задайте правильный промт в формате: "
+        'Роль (ты опытный специалист в..)+ Задача (напиши пост на тему...)+ Стиль и ограничения (Дружелюбный/официальный и др, не используй слова ***, избегай банальных советов вроде "просто начни" и т.п.) + критерии хорошего результата (Опишите, каким должен быть итоговый текст: Экспертный, продающий, с цепляющим заголовком, с призывом к действию/вопросом).',
         vk_client,
         generation_cancel_keyboard,
     )
 
 
-@message_handler(user_state="idle", text="генерация изображения")
-@message_handler(user_state="idle", text="изображение")
-@message_handler(user_state="idle", text="картинка")
+@message_handler(user_state=UserState.IDLE, text="генерация изображения")
+@message_handler(user_state=UserState.IDLE, text="изображение")
+@message_handler(user_state=UserState.IDLE, text="картинка")
 async def image_generation_start_handler(
     user_id: int,
     message_text: str,
@@ -400,17 +416,19 @@ async def image_generation_start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await set_user_state(user_id, "awaiting_image_prompt", redis_client)
+    await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
     await send_message(
         user_id,
-        "Опишите изображение, которое нужно сгенерировать.",
+        "Ваня готов к работе 😎 Что будем создавать?"
+        "📸 Чтобы я подготовил для вас изображение, задайте правильный промт в формате: "
+        "[Что изображено] + [Стиль] + [Цвета] + [Композиция/Расположение объектов] + [Текст, если нужен] + [Формат: 1:1, 16:9, 9:16, 21:9, 5:4 и др]. Если нужно, прикрепите фото или референс.",
         vk_client,
         generation_cancel_keyboard,
     )
 
 
-@message_handler(user_state="awaiting_post_prompt", text="отмена")
-@message_handler(user_state="awaiting_image_prompt", text="отмена")
+@message_handler(user_state=UserState.AWAITING_POST_PROMPT, text="отмена")
+@message_handler(user_state=UserState.AWAITING_IMAGE_PROMPT, text="отмена")
 async def generation_cancel_handler(
     user_id: int,
     message_text: str,
@@ -419,11 +437,11 @@ async def generation_cancel_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await set_user_state(user_id, "idle", redis_client)
+    await set_user_state(user_id, UserState.IDLE, redis_client)
     await send_message(user_id, "Генерация отменена.", vk_client, main_menu_keyboard)
 
 
-@message_handler(user_state="awaiting_post_prompt")
+@message_handler(user_state=UserState.AWAITING_POST_PROMPT)
 async def post_prompt_handler(
     user_id: int,
     message_text: str,
@@ -437,7 +455,7 @@ async def post_prompt_handler(
         await send_message(user_id, "Пришлите текстовый запрос для поста.", vk_client)
         return
 
-    await set_user_state(user_id, "idle", redis_client)
+    await set_user_state(user_id, UserState.IDLE, redis_client)
     await _run_generation(
         user_id,
         prompt,
@@ -449,7 +467,7 @@ async def post_prompt_handler(
     )
 
 
-@message_handler(user_state="awaiting_image_prompt")
+@message_handler(user_state=UserState.AWAITING_IMAGE_PROMPT)
 async def image_prompt_handler(
     user_id: int,
     message_text: str,
@@ -463,7 +481,7 @@ async def image_prompt_handler(
         await send_message(user_id, "Пришлите описание изображения.", vk_client)
         return
 
-    await set_user_state(user_id, "idle", redis_client)
+    await set_user_state(user_id, UserState.IDLE, redis_client)
     await _run_generation(
         user_id,
         prompt,
