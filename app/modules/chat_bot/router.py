@@ -39,7 +39,7 @@ async def vk_callback(
         user_id = data["object"]["message"]["from_id"]
         message_text = data["object"]["message"]["text"]
         attachments = data["object"]["message"]["attachments"]
-        if attachments:
+        if attachments and attachments[0].get("type") == "link":
             message_text = attachments[0].get("link", {}).get("url", message_text)
         asyncio.create_task(
             handle_message_async(
@@ -49,6 +49,7 @@ async def vk_callback(
                 redis_client,
                 ai_client,
                 request.app.state.db.session_factory,
+                attachments,
             )
         )
         return "ok"

@@ -1,6 +1,8 @@
 import asyncio
+import inspect
 import random
 import uuid
+from pathlib import Path
 
 from loguru import logger
 from redis.asyncio import Redis
@@ -30,11 +32,16 @@ from .keyboards import (
 )
 from .states import UserState
 from .utils import (
+    clear_image_reference,
     extract_group_id,
+    extract_photo_url,
     generate_message_text,
+    get_image_reference,
     get_user_state,
+    save_image_reference,
     send_message,
     set_user_state,
+    upload_message_photo,
 )
 
 handlers = []
@@ -49,6 +56,8 @@ def message_handler(user_state: UserState | None = None, text: str | None = None
                 "user_state": user_state,
                 "text": text,
                 "func": func,
+                "accepts_attachments": "attachments"
+                in inspect.signature(func).parameters,
             }
         )
         return func
@@ -63,6 +72,7 @@ async def handle_message_async(
     redis_client: Redis,
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
+    attachments: list[dict] | None = None,
 ):
     """Обработчик входящих сообщений"""
     try:
@@ -70,6 +80,7 @@ async def handle_message_async(
         normalized_text = message_text.lower().strip()
 
         if normalized_text == "стоп":
+            await clear_image_reference(user_id, redis_client)
             await set_user_state(user_id, UserState.INACTIVE, redis_client)
             await send_message(
                 user_id,
@@ -83,14 +94,17 @@ async def handle_message_async(
             if handler["user_state"] == state and (
                 handler["text"] is None or handler["text"] == normalized_text
             ):
-                result = handler["func"](
+                args = [
                     user_id,
                     message_text,
                     vk_client,
                     redis_client,
                     ai_client,
                     db_session_factory,
-                )
+                ]
+                if handler["accepts_attachments"]:
+                    args.append(attachments)
+                result = handler["func"](*args)
                 if asyncio.iscoroutine(result):
                     await result
                 return
@@ -187,6 +201,7 @@ async def _run_generation(
     redis_client: Redis,
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
+    reference_image: bytes | None = None,
 ) -> None:
     async with db_session_factory() as db:
         user, costs = await _ensure_user(db, user_id, vk_client, redis_client)
@@ -221,16 +236,32 @@ async def _run_generation(
 
     try:
         if generation_type == GenerationType.IMAGE:
-            result, cost_rub = await ai_client.generate_image(prompt, task.id)
-            result_message = f"Готово: https://vk.wonderrfau1t.site/images/{result}"
+            result, cost_rub = await ai_client.generate_image(
+                prompt,
+                task.id,
+                reference_image=reference_image,
+            )
+            result_attachment = await upload_message_photo(
+                user_id,
+                Path("media") / result,
+                vk_client,
+            )
+            result_message = "Готово! Изображение прикрепил к сообщению."
         else:
             result, cost_rub = await ai_client.generate_post(prompt, task.id)
             result_message = result
+            result_attachment = None
 
         async with db_session_factory() as db:
             await update_task(db, task.id, TaskStatus.SUCCESS, result, cost_rub)
 
-        await send_message(user_id, result_message, vk_client, main_menu_keyboard)
+        await send_message(
+            user_id,
+            result_message,
+            vk_client,
+            main_menu_keyboard,
+            result_attachment,
+        )
     except Exception as exc:
         await _refund_generation_cost(
             db_session_factory,
@@ -413,6 +444,7 @@ async def image_generation_start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    await clear_image_reference(user_id, redis_client)
     await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
     await send_message(
         user_id,
@@ -434,6 +466,7 @@ async def generation_cancel_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    await clear_image_reference(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     await send_message(user_id, "Возращаюсь назад", vk_client, main_menu_keyboard)
 
@@ -472,12 +505,42 @@ async def image_prompt_handler(
     redis_client: Redis,
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
+    attachments: list[dict] | None = None,
 ):
     prompt = message_text.strip()
+    reference_image = None
+
+    if photo_url := extract_photo_url(attachments):
+        reference_image = await vk_client.download(photo_url)
+        if len(reference_image) > 20 * 1024 * 1024:
+            await send_message(
+                user_id,
+                "Фото слишком большое. Пришлите изображение размером до 20 МБ.",
+                vk_client,
+                generation_cancel_keyboard,
+            )
+            return
+        await save_image_reference(user_id, reference_image, redis_client)
+
     if not prompt:
-        await send_message(user_id, "Пришлите описание изображения.", vk_client)
+        if reference_image:
+            await send_message(
+                user_id,
+                "Референс получил 👍 Теперь пришлите текстовое описание изображения.",
+                vk_client,
+                generation_cancel_keyboard,
+            )
+        else:
+            await send_message(
+                user_id,
+                "Пришлите описание изображения и, при необходимости, фото-референс.",
+                vk_client,
+                generation_cancel_keyboard,
+            )
         return
 
+    reference_image = reference_image or await get_image_reference(user_id, redis_client)
+    await clear_image_reference(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     await _run_generation(
         user_id,
@@ -487,4 +550,5 @@ async def image_prompt_handler(
         redis_client,
         ai_client,
         db_session_factory,
+        reference_image=reference_image,
     )

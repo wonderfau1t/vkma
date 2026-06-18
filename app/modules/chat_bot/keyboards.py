@@ -96,7 +96,6 @@ main_menu_keyboard = dumps(
                         "link": "https://vk.com/club228359093?w=donut_payment-228359093&levelId=2855",
                         "label": "Добавить генераций",
                     },
-                    # "color": "secondary",
                 }
             ],
             [
