@@ -89,7 +89,8 @@ async def handle_message_async(
             return
 
         for handler in handlers:
-            if handler["user_state"] == state and (
+            state_matches = handler["user_state"] is None or handler["user_state"] == state
+            if state_matches and (
                 handler["text"] is None or handler["text"] == normalized_text
             ):
                 args = [
@@ -174,6 +175,39 @@ async def _create_generation_task(
         user.id,
         prompt,
     )
+
+
+async def _ensure_can_start_generation(
+    user_id: int,
+    generation_type: GenerationType,
+    vk_client: AsyncVKApiClient,
+    redis_client: Redis,
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> bool:
+    async with db_session_factory() as db:
+        user, costs = await _ensure_user(db, user_id, vk_client, redis_client)
+        task_in_progress = await has_processing_tasks(db, user_id)
+        if task_in_progress:
+            await send_message(
+                user_id,
+                "У вас уже есть задача в работе. Дождитесь результата и попробуйте снова.",
+                vk_client,
+                main_menu_keyboard,
+            )
+            return False
+
+        cost_key = "image" if generation_type == GenerationType.IMAGE else "post"
+        generation_cost = costs[cost_key]
+        if user.balance < generation_cost:
+            await send_message(
+                user_id,
+                f"Недостаточно токенов на балансе. Нужно {generation_cost}, сейчас {user.balance}.",
+                vk_client,
+                main_menu_keyboard,
+            )
+            return False
+
+    return True
 
 
 async def _refund_generation_cost(
@@ -264,8 +298,8 @@ async def _run_generation(
         )
 
 
-@message_handler(user_state=UserState.INACTIVE, text="привет, ваня")
-@message_handler(user_state=UserState.INACTIVE, text="начать")
+@message_handler(text="привет, ваня")
+@message_handler(text="начать")
 async def start_handler(
     user_id: int,
     message_text: str,
@@ -274,6 +308,7 @@ async def start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    await clear_image_reference(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     response = (
         "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту.\n\n"
@@ -409,6 +444,15 @@ async def post_generation_start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    if not await _ensure_can_start_generation(
+        user_id,
+        GenerationType.POST,
+        vk_client,
+        redis_client,
+        db_session_factory,
+    ):
+        return
+
     await set_user_state(user_id, UserState.AWAITING_POST_PROMPT, redis_client)
     await send_message(
         user_id,
@@ -430,6 +474,15 @@ async def image_generation_start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
+    if not await _ensure_can_start_generation(
+        user_id,
+        GenerationType.IMAGE,
+        vk_client,
+        redis_client,
+        db_session_factory,
+    ):
+        return
+
     await clear_image_reference(user_id, redis_client)
     await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
     await send_message(
