@@ -70,16 +70,13 @@ async def fetch_basic_group_info(
     """Получение основной информации о группе"""
     params = {
         "group_id": group_id,
-        "fields": "contacts,counters,cover,description,fixed_post,market,activity,members_count",
+        "fields": "contacts,cover,description,fixed_post,market,activity,members_count",
     }
     response = await vk_client.get("groups.getById", params)
     data: dict = response.get("response", {}).get("groups", [{}])[0]
 
     if not data.get("name") or data.get("is_closed"):
         return None, 0
-
-    online_status = await vk_client.get("groups.getOnlineStatus", {"group_id": data["id"]})
-    is_online = online_status.get("response", {}).get("status") == "online"
 
     return GroupInfo(
         name=data.get("name"),
