@@ -93,7 +93,7 @@ main_menu_keyboard = dumps(
                 {
                     "action": {
                         "type": "open_link",
-                        "link": "https://vk.com/club228359093?w=donut_payment-228359093&levelId=2855",
+                        "link": "https://vk.com/lesya_ostashova.targetolog?w=donut_payment-48544404&levelId=3518",
                         "label": "Добавить генераций",
                     },
                 }

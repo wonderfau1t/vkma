@@ -28,7 +28,7 @@ from .schemas import (
     UsersListResponse,
 )
 
-IMAGE_RESULT_BASE_URL = "https://vk.wonderrfau1t.site/images"
+IMAGE_RESULT_BASE_URL = "https://api.lesyatarget.ru/images"
 
 
 def _build_generation_settings_response(settings: dict[str, int]) -> GenerationSettingsResponse:

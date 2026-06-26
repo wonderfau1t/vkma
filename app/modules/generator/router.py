@@ -1,9 +1,7 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
 import uuid
-from typing import Literal
-
-from typing import Annotated
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from loguru import logger
@@ -66,21 +64,21 @@ async def get_balance(
     try:
         # Получаем актуальный статус из VK
         is_now_donut = await is_donut(vk_client, settings.group_id, user_id)
-        
+
         # Определяем, изменился ли статус по сравнению с базой
         status_changed = is_now_donut != user.is_donut
-        
+
         # ЛОГИКА ОБНОВЛЕНИЯ
         if status_changed or is_time_to_reset:
             # Определяем новый лимит
             new_balance = costs["donut_tokens"] if is_now_donut else costs["base_tokens"]
-            
+
             user.balance = new_balance
             user.is_donut = is_now_donut
             user.last_balance_reset_at = now
-            
+
             await db.commit()
-            
+
             reason = "смена статуса" if status_changed else "плановое обновление (30 дней)"
             logger.info(f"Баланс пользователя {user_id} обновлен до {new_balance} ({reason})")
 
@@ -125,7 +123,7 @@ async def get_task(request: Request, task_id: str, db: AsyncSession = Depends(ge
         return {"status": task.status, "errorMessage": task.result}
     return {
         "status": task.status,
-        "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
+        "result": f"https://api.lesyatarget.ru/images/{task.result}"
         if task.type == GenerationType.IMAGE
         else task.result,
     }
@@ -179,8 +177,15 @@ async def generate(
 
         asyncio.create_task(
             process_generation(
-                ai_client, db, gen_type, task_id, prompt, image_bytes, aspect_ratio,
-                user_id=user_id, cost=generation_cost,
+                ai_client,
+                db,
+                gen_type,
+                task_id,
+                prompt,
+                image_bytes,
+                aspect_ratio,
+                user_id=user_id,
+                cost=generation_cost,
             )
         )
 
@@ -213,7 +218,7 @@ async def get_history(
             "id": task.id,
             "createdAt": task.created_at.strftime("%H:%M %d.%m.%Y"),
             "prompt": task.prompt,
-            "result": f"https://vk.wonderrfau1t.site/images/{task.result}"
+            "result": f"https://api.lesyatarget.ru/images/{task.result}"
             if task.type == GenerationType.IMAGE
             else task.result,
         }

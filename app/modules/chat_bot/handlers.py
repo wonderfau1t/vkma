@@ -24,8 +24,6 @@ from app.modules.generator.service import get_vk_user_profile, is_donut
 from .keyboards import (
     empty_keyboard,
     generation_cancel_keyboard,
-    inline_group_analysis_keyboard,
-    inline_main_menu_keyboard,
     main_menu_keyboard,
     to_main_menu_keyboard,
 )
@@ -54,8 +52,7 @@ def message_handler(user_state: UserState | None = None, text: str | None = None
                 "user_state": user_state,
                 "text": text,
                 "func": func,
-                "accepts_attachments": "attachments"
-                in inspect.signature(func).parameters,
+                "accepts_attachments": "attachments" in inspect.signature(func).parameters,
             }
         )
         return func
@@ -90,9 +87,7 @@ async def handle_message_async(
 
         for handler in handlers:
             state_matches = handler["user_state"] is None or handler["user_state"] == state
-            if state_matches and (
-                handler["text"] is None or handler["text"] == normalized_text
-            ):
+            if state_matches and (handler["text"] is None or handler["text"] == normalized_text):
                 args = [
                     user_id,
                     message_text,
@@ -273,7 +268,7 @@ async def _run_generation(
                 task.id,
                 reference_image=reference_image,
             )
-            result_message = f"Готово: https://vk.wonderrfau1t.site/images/{result}"
+            result_message = f"Готово: https://api.lesyatarget.ru/images/{result}"
         else:
             result, cost_rub = await ai_client.generate_post(prompt, task.id)
             result_message = result
