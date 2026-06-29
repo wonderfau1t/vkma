@@ -294,6 +294,9 @@ async def _run_generation(
 
 
 @message_handler(text="привет, ваня")
+@message_handler(text="привет, ваня!")
+@message_handler(text="привет ваня!")
+@message_handler(text="привет ваня")
 @message_handler(text="начать")
 async def start_handler(
     user_id: int,
