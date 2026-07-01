@@ -21,7 +21,7 @@ class AIService:
         self,
         prompt: str,
         image_name: str,
-        model: str = "gemini-2.5-flash-image",
+        model: str = "gemini-3.1-flash-image",
         reference_image: bytes | None = None,
         aspect_ratio: str | None = None,
     ):
