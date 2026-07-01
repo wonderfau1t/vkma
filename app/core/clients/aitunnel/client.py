@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 
 from loguru import logger
@@ -24,15 +25,9 @@ class AIService:
         reference_image: bytes | None = None,
         aspect_ratio: str | None = None,
     ):
-        extra = (
-            {
-                "image_config": {
-                    "aspect_ratio": aspect_ratio,
-                }
-            }
-            if aspect_ratio
-            else {}
-        )
+        image_config = {"aspect_ratio": aspect_ratio} if aspect_ratio else None
+        generation_extra = {"image_config": image_config} if image_config else {}
+        edit_extra = {"image_config": json.dumps(image_config)} if image_config else {}
         logger.info(
             f"Генерация изображения [{image_name}]: "
             f"референс={'да' if reference_image else 'нет'}, "
@@ -43,11 +38,11 @@ class AIService:
                 image_file = io.BytesIO(reference_image)
                 image_file.name = "reference.png"
                 response = await self._client.images.edit(
-                    model=model, image=image_file, prompt=prompt, extra_body=extra
+                    model=model, image=image_file, prompt=prompt, extra_body=edit_extra
                 )
             else:
                 response = await self._client.images.generate(
-                    model=model, prompt=prompt, extra_body=extra
+                    model=model, prompt=prompt, extra_body=generation_extra
                 )
 
             if not response.data or not response.data[0]:
