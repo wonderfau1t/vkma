@@ -54,7 +54,7 @@ async def fetch_group_analysis(
 
     posts_data = await analyze_posts(real_id, group_info.members_count, vk_client)
     if posts_data is None:
-        return None
+        return group_info
 
     group_info.result_of_check.reposts = posts_data["reposts"]
     group_info.result_of_check.hashtags = posts_data["hashtags"]
@@ -171,6 +171,13 @@ def calculate_average_time_between_posts(posts: list) -> dict:
 
 def _evaluate_field(field: str, value: Any, messages: dict) -> Tuple[str, Parameter, float]:
     """Оценивает одно поле и возвращает категорию, Parameter и баллы."""
+    if value is None:
+        param = Parameter(
+            id=field,
+            title=messages[field]["title"],
+            description="Невозможно провести анализ по данному критерию. Проверьте, были ли опубликованы записи за последние 30 дней."
+        )
+        return "bad", param, 0
     if field == "average_time_between_posts":
         return _evaluate_average_time(value, messages)
     if field == "er":
