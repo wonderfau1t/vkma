@@ -48,8 +48,9 @@ class AIService:
             if not response.data or not response.data[0]:
                 raise ValueError("API вернул пустой список данных")
 
-            image_data = response.data[0].url
+            image_data = response.data[0].b64_json
             if not image_data:
+                logger.warning(response)
                 raise ValueError("В объекте ответа отсутствуют и данные изображения, и URL")
 
             path = self._save_image(image_data, image_name)
