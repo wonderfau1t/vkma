@@ -26,7 +26,7 @@ class AIService:
         aspect_ratio: str | None = None,
     ):
         image_config = {"aspect_ratio": aspect_ratio} if aspect_ratio else None
-        generation_extra = {"image_config": image_config} if image_config else {}
+        # generation_extra = {"image_config": image_config} if image_config else {}
         edit_extra = {"image_config": json.dumps(image_config)} if image_config else {}
         logger.info(
             f"Генерация изображения [{image_name}]: "
@@ -42,7 +42,7 @@ class AIService:
                 )
             else:
                 response = await self._client.images.generate(
-                    model=model, prompt=prompt, extra_body=generation_extra
+                    model=model, prompt=prompt, extra_body=image_config
                 )
 
             if not response.data or not response.data[0]:
