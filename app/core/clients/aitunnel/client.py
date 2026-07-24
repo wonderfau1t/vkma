@@ -27,7 +27,7 @@ class AIService:
     ):
         image_config = {"aspect_ratio": aspect_ratio} if aspect_ratio else None
         # generation_extra = {"image_config": image_config} if image_config else {}
-        edit_extra = {"image_config": json.dumps(image_config)} if image_config else {}
+        edit_extra = json.dumps(image_config) if image_config else {}
         logger.info(
             f"Генерация изображения [{image_name}]: "
             f"референс={'да' if reference_image else 'нет'}, "
