@@ -9,3 +9,4 @@ class UserState(str, Enum):
     AWAITING_LINK = "awaiting_link"
     AWAITING_POST_PROMPT = "awaiting_post_prompt"
     AWAITING_IMAGE_PROMPT = "awaiting_image_prompt"
+    AWAITING_IMAGE_ASPECT_RATIO = "awaiting_image_aspect_ratio"

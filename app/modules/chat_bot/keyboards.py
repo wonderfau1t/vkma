@@ -136,6 +136,76 @@ generation_cancel_keyboard = dumps(
 )
 
 
+image_aspect_ratio_keyboard = dumps(
+    {
+        "buttons": [
+            [
+                {
+                    "action": {"type": "text", "label": "1:1"},
+                    "color": "primary",
+                },
+                {
+                    "action": {"type": "text", "label": "16:9"},
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "9:16"},
+                    "color": "secondary",
+                },
+                {
+                    "action": {"type": "text", "label": "4:3"},
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "3:4"},
+                    "color": "secondary",
+                },
+                {
+                    "action": {"type": "text", "label": "3:2"},
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "2:3"},
+                    "color": "secondary",
+                },
+                {
+                    "action": {"type": "text", "label": "21:9"},
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "4:5"},
+                    "color": "secondary",
+                },
+                {
+                    "action": {"type": "text", "label": "5:4"},
+                    "color": "secondary",
+                },
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "Авто"},
+                    "color": "positive",
+                }
+            ],
+            [
+                {
+                    "action": {"type": "text", "label": "Назад"},
+                    "color": "secondary",
+                }
+            ],
+        ]
+    }
+)
+
+
 inline_group_analysis_keyboard = dumps(
     {
         "inline": True,

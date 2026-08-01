@@ -35,7 +35,12 @@ async def send_message(
     await vk_client.post("messages.send", params)
 
 
-def extract_photo_url(attachments: list[dict] | None) -> str | None:
+MAX_IMAGE_REFERENCES = 3
+IMAGE_CONTEXT_TTL = 3600
+
+
+def extract_photo_urls(attachments: list[dict] | None) -> list[str]:
+    urls = []
     for attachment in attachments or []:
         if attachment.get("type") != "photo":
             continue
@@ -48,27 +53,100 @@ def extract_photo_url(attachments: list[dict] | None) -> str | None:
                 key=lambda size: size.get("width", 0) * size.get("height", 0),
             )
             if url := largest.get("url"):
-                return url
+                urls.append(url)
+                continue
 
         for field in ("photo_2560", "photo_1280", "photo_807", "photo_604"):
             if url := photo.get(field):
-                return url
+                urls.append(url)
+                break
 
-    return None
+    return urls
+
+
+def extract_photo_url(attachments: list[dict] | None) -> str | None:
+    urls = extract_photo_urls(attachments)
+    return urls[0] if urls else None
+
+
+async def save_image_references(
+    user_id: int,
+    images: list[bytes],
+    redis_client: Redis,
+) -> int:
+    current_images = await get_image_references(user_id, redis_client)
+    all_images = [*current_images, *images]
+    if len(all_images) > MAX_IMAGE_REFERENCES:
+        raise ValueError(
+            f"Можно использовать не более {MAX_IMAGE_REFERENCES} референсных изображений"
+        )
+    if any(not image for image in all_images):
+        raise ValueError("Референсное изображение не должно быть пустым")
+
+    list_key = f"user_image_references:{user_id}"
+    legacy_key = f"user_image_reference:{user_id}"
+    await redis_client.delete(list_key, legacy_key)
+    if all_images:
+        await redis_client.rpush(list_key, *all_images)
+        await redis_client.expire(list_key, IMAGE_CONTEXT_TTL)
+    return len(all_images)
+
+
+async def get_image_references(user_id: int, redis_client: Redis) -> list[bytes]:
+    images = await redis_client.lrange(f"user_image_references:{user_id}", 0, -1)
+    if images:
+        return list(images)
+
+    legacy_image = await redis_client.get(f"user_image_reference:{user_id}")
+    return [legacy_image] if legacy_image else []
+
+
+async def clear_image_references(user_id: int, redis_client: Redis) -> None:
+    await redis_client.delete(
+        f"user_image_references:{user_id}",
+        f"user_image_reference:{user_id}",
+    )
+
+
+async def save_image_prompt(user_id: int, prompt: str, redis_client: Redis) -> None:
+    await redis_client.setex(
+        f"user_image_prompt:{user_id}",
+        IMAGE_CONTEXT_TTL,
+        prompt,
+    )
+
+
+async def get_image_prompt(user_id: int, redis_client: Redis) -> str | None:
+    prompt = await redis_client.get(f"user_image_prompt:{user_id}")
+    if isinstance(prompt, bytes):
+        return prompt.decode("utf-8")
+    return prompt
+
+
+async def clear_image_generation_context(
+    user_id: int,
+    redis_client: Redis,
+) -> None:
+    await redis_client.delete(
+        f"user_image_references:{user_id}",
+        f"user_image_reference:{user_id}",
+        f"user_image_prompt:{user_id}",
+    )
 
 
 async def save_image_reference(
     user_id: int, image: bytes, redis_client: Redis
 ) -> None:
-    await redis_client.setex(f"user_image_reference:{user_id}", 3600, image)
+    await save_image_references(user_id, [image], redis_client)
 
 
 async def get_image_reference(user_id: int, redis_client: Redis) -> bytes | None:
-    return await redis_client.get(f"user_image_reference:{user_id}")
+    images = await get_image_references(user_id, redis_client)
+    return images[0] if images else None
 
 
 async def clear_image_reference(user_id: int, redis_client: Redis) -> None:
-    await redis_client.delete(f"user_image_reference:{user_id}")
+    await clear_image_references(user_id, redis_client)
 
 
 async def set_user_state(user_id: int, state: UserState, redis_client: Redis) -> None:

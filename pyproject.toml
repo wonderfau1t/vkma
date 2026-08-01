@@ -12,7 +12,6 @@ dependencies = [
     "greenlet>=3.4.0",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
-    "openai>=2.32.0",
     "pydantic-settings>=2.13.1",
     "python-multipart>=0.0.26",
     "redis>=7.4.0",

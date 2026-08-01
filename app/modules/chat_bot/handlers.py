@@ -24,23 +24,39 @@ from app.modules.generator.service import get_vk_user_profile, is_donut
 from .keyboards import (
     empty_keyboard,
     generation_cancel_keyboard,
+    image_aspect_ratio_keyboard,
     main_menu_keyboard,
     to_main_menu_keyboard,
 )
 from .states import UserState
 from .utils import (
-    clear_image_reference,
+    MAX_IMAGE_REFERENCES,
+    clear_image_generation_context,
     extract_group_id,
-    extract_photo_url,
+    extract_photo_urls,
     generate_message_text,
-    get_image_reference,
+    get_image_prompt,
+    get_image_references,
     get_user_state,
-    save_image_reference,
+    save_image_prompt,
+    save_image_references,
     send_message,
     set_user_state,
 )
 
 handlers = []
+IMAGE_ASPECT_RATIOS = {
+    "1:1",
+    "16:9",
+    "9:16",
+    "4:3",
+    "3:4",
+    "4:5",
+    "5:4",
+    "3:2",
+    "2:3",
+    "21:9",
+}
 
 
 def message_handler(user_state: UserState | None = None, text: str | None = None):
@@ -75,7 +91,7 @@ async def handle_message_async(
         normalized_text = message_text.lower().strip()
 
         if normalized_text == "стоп":
-            await clear_image_reference(user_id, redis_client)
+            await clear_image_generation_context(user_id, redis_client)
             await set_user_state(user_id, UserState.INACTIVE, redis_client)
             await send_message(
                 user_id,
@@ -228,7 +244,8 @@ async def _run_generation(
     redis_client: Redis,
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
-    reference_image: bytes | None = None,
+    reference_images: list[bytes] | None = None,
+    aspect_ratio: str | None = None,
 ) -> None:
     async with db_session_factory() as db:
         user, costs = await _ensure_user(db, user_id, vk_client, redis_client)
@@ -266,7 +283,8 @@ async def _run_generation(
             result, cost_rub = await ai_client.generate_image(
                 prompt,
                 task.id,
-                reference_image=reference_image,
+                reference_image=reference_images,
+                aspect_ratio=aspect_ratio,
             )
             result_message = f"Готово: https://api.lesyatarget.ru/images/{result}"
         else:
@@ -306,7 +324,7 @@ async def start_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await clear_image_reference(user_id, redis_client)
+    await clear_image_generation_context(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     response = (
         "Привет 👋 Меня зовут Ваня, я Ai-помощник по контенту.\n\n"
@@ -481,13 +499,15 @@ async def image_generation_start_handler(
     ):
         return
 
-    await clear_image_reference(user_id, redis_client)
+    await clear_image_generation_context(user_id, redis_client)
     await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
     await send_message(
         user_id,
         "Ваня готов к работе 😎 Что будем создавать?\n\n"
         "📸 Чтобы я подготовил для вас изображение, задайте правильный промт в формате:\n\n"
-        "[Что изображено] + [Стиль] + [Цвета] + [Композиция/Расположение объектов] + [Текст, если нужен] + [Формат: 1:1, 16:9, 9:16, 21:9, 5:4 и др]. Если нужно, прикрепите фото или референс.",
+        "[Что изображено] + [Стиль] + [Цвета] + [Композиция/Расположение объектов] + [Текст, если нужен]. "
+        "Можно прикрепить до 3 фото-референсов — одним сообщением или по очереди. "
+        "Соотношение сторон выберете следующим шагом.",
         vk_client,
         generation_cancel_keyboard,
     )
@@ -495,6 +515,7 @@ async def image_generation_start_handler(
 
 @message_handler(user_state=UserState.AWAITING_POST_PROMPT, text="назад")
 @message_handler(user_state=UserState.AWAITING_IMAGE_PROMPT, text="назад")
+@message_handler(user_state=UserState.AWAITING_IMAGE_ASPECT_RATIO, text="назад")
 async def generation_cancel_handler(
     user_id: int,
     message_text: str,
@@ -503,7 +524,7 @@ async def generation_cancel_handler(
     ai_client: AIService,
     db_session_factory: async_sessionmaker[AsyncSession],
 ):
-    await clear_image_reference(user_id, redis_client)
+    await clear_image_generation_context(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     await send_message(user_id, "Возращаюсь назад", vk_client, main_menu_keyboard)
 
@@ -545,25 +566,45 @@ async def image_prompt_handler(
     attachments: list[dict] | None = None,
 ):
     prompt = message_text.strip()
-    reference_image = None
+    stored_references = await get_image_references(user_id, redis_client)
+    photo_urls = extract_photo_urls(attachments)
 
-    if photo_url := extract_photo_url(attachments):
-        reference_image = await vk_client.download(photo_url)
-        if len(reference_image) > 20 * 1024 * 1024:
+    if len(stored_references) + len(photo_urls) > MAX_IMAGE_REFERENCES:
+        await send_message(
+            user_id,
+            f"Можно прикрепить не более {MAX_IMAGE_REFERENCES} референсов. "
+            f"Сейчас сохранено: {len(stored_references)}.",
+            vk_client,
+            generation_cancel_keyboard,
+        )
+        return
+
+    if photo_urls:
+        downloaded_references = list(
+            await asyncio.gather(*(vk_client.download(url) for url in photo_urls))
+        )
+        if any(len(image) > 20 * 1024 * 1024 for image in downloaded_references):
             await send_message(
                 user_id,
-                "Фото слишком большое. Пришлите изображение размером до 20 МБ.",
+                "Одно из фото слишком большое. Каждое изображение должно быть до 20 МБ.",
                 vk_client,
                 generation_cancel_keyboard,
             )
             return
-        await save_image_reference(user_id, reference_image, redis_client)
+        reference_count = await save_image_references(
+            user_id,
+            downloaded_references,
+            redis_client,
+        )
+    else:
+        reference_count = len(stored_references)
 
     if not prompt:
-        if reference_image:
+        if reference_count:
             await send_message(
                 user_id,
-                "Референс получил 👍 Теперь пришлите текстовое описание изображения.",
+                f"Референсы получил: {reference_count}/{MAX_IMAGE_REFERENCES} 👍 "
+                "Можете добавить ещё или прислать текстовое описание изображения.",
                 vk_client,
                 generation_cancel_keyboard,
             )
@@ -576,8 +617,55 @@ async def image_prompt_handler(
             )
         return
 
-    reference_image = reference_image or await get_image_reference(user_id, redis_client)
-    await clear_image_reference(user_id, redis_client)
+    await save_image_prompt(user_id, prompt, redis_client)
+    await set_user_state(
+        user_id,
+        UserState.AWAITING_IMAGE_ASPECT_RATIO,
+        redis_client,
+    )
+    await send_message(
+        user_id,
+        "Выберите соотношение сторон будущего изображения 👇\n"
+        "«Авто» — модель выберет формат самостоятельно.",
+        vk_client,
+        image_aspect_ratio_keyboard,
+    )
+
+
+@message_handler(user_state=UserState.AWAITING_IMAGE_ASPECT_RATIO)
+async def image_aspect_ratio_handler(
+    user_id: int,
+    message_text: str,
+    vk_client: AsyncVKApiClient,
+    redis_client: Redis,
+    ai_client: AIService,
+    db_session_factory: async_sessionmaker[AsyncSession],
+):
+    selected_value = message_text.strip().lower()
+    if selected_value != "авто" and selected_value not in IMAGE_ASPECT_RATIOS:
+        await send_message(
+            user_id,
+            "Выберите соотношение сторон кнопкой на клавиатуре.",
+            vk_client,
+            image_aspect_ratio_keyboard,
+        )
+        return
+
+    prompt = await get_image_prompt(user_id, redis_client)
+    if not prompt:
+        await clear_image_generation_context(user_id, redis_client)
+        await set_user_state(user_id, UserState.AWAITING_IMAGE_PROMPT, redis_client)
+        await send_message(
+            user_id,
+            "Время ожидания истекло. Пришлите описание изображения ещё раз.",
+            vk_client,
+            generation_cancel_keyboard,
+        )
+        return
+
+    reference_images = await get_image_references(user_id, redis_client)
+    aspect_ratio = None if selected_value == "авто" else selected_value
+    await clear_image_generation_context(user_id, redis_client)
     await set_user_state(user_id, UserState.IDLE, redis_client)
     await _run_generation(
         user_id,
@@ -587,5 +675,6 @@ async def image_prompt_handler(
         redis_client,
         ai_client,
         db_session_factory,
-        reference_image=reference_image,
+        reference_images=reference_images,
+        aspect_ratio=aspect_ratio,
     )

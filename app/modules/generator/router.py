@@ -135,7 +135,7 @@ async def generate(
     prompt: Annotated[str, Form()],
     user_id: VKVerifiedTokenDep,
     aspect_ratio: Annotated[str | None, Form()] = None,
-    reference_image: UploadFile | None = File(None),
+    reference_image: list[UploadFile] | None = File(None, max_length=3),
     db: AsyncSession = Depends(get_db),
     ai_client: AIService = Depends(get_ai_client),
     redis_client: Redis = Depends(get_redis_client),
@@ -158,7 +158,18 @@ async def generate(
 
     task_id = str(uuid.uuid4())
     gen_type = GenerationType.IMAGE if type == "image" else GenerationType.POST
-    image_bytes = await reference_image.read() if reference_image else None
+    reference_files = reference_image or []
+    if len(reference_files) > 3:
+        raise HTTPException(
+            status_code=422,
+            detail="Можно загрузить не более 3 референсных изображений",
+        )
+    reference_images = [await image.read() for image in reference_files]
+    if any(not image for image in reference_images):
+        raise HTTPException(
+            status_code=422,
+            detail="Референсное изображение не должно быть пустым",
+        )
 
     try:
         user.balance -= generation_cost
@@ -182,7 +193,7 @@ async def generate(
                 gen_type,
                 task_id,
                 prompt,
-                image_bytes,
+                reference_images,
                 aspect_ratio,
                 user_id=user_id,
                 cost=generation_cost,

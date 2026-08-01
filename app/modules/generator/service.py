@@ -56,7 +56,7 @@ async def process_generation(
     generation_type: str,
     task_id: str,
     prompt: str,
-    reference_image: bytes | None = None,
+    reference_images: list[bytes] | None = None,
     aspect_ratio: str | None = None,
     user_id: int = 0,
     cost: int = 0,
@@ -64,7 +64,10 @@ async def process_generation(
     try:
         if generation_type == "image":
             result, cost_rub = await client.generate_image(
-                prompt, task_id, reference_image=reference_image, aspect_ratio=aspect_ratio
+                prompt,
+                task_id,
+                reference_image=reference_images,
+                aspect_ratio=aspect_ratio,
             )
         else:
             result, cost_rub = await client.generate_post(prompt, task_id)
